@@ -46,6 +46,15 @@ bool CastToBool(const valtype &vch) {
     return false;
 }
 
+void MakeSameSize(valtype& vch1, valtype& vch2)
+{
+    // Lengthen the shorter one
+    if (vch1.size() < vch2.size())
+        vch1.resize(vch2.size(), 0);
+    if (vch2.size() < vch1.size())
+        vch2.resize(vch1.size(), 0);
+}
+
 /**
  * Script is a stack machine (like Forth) that evaluates a predicate
  * returning a bool indicating valid or not.  There are no loops.
@@ -335,12 +344,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
-            if (opcode == OP_CAT || opcode == OP_SUBSTR || opcode == OP_LEFT ||
-                opcode == OP_RIGHT || opcode == OP_INVERT || opcode == OP_AND ||
-                opcode == OP_OR || opcode == OP_XOR || opcode == OP_2MUL ||
-                opcode == OP_2DIV || opcode == OP_MUL || opcode == OP_DIV ||
-                opcode == OP_MOD || opcode == OP_LSHIFT ||
-                opcode == OP_RSHIFT) {
+            if (opcode == OP_2MUL || opcode == OP_2DIV || opcode == OP_MUL ||
+                opcode == OP_DIV  || opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
                 // Disabled opcodes.
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
@@ -781,6 +786,51 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     //
                     // Bitwise logic
                     //
+                    case OP_INVERT:
+                    {
+                        // (in - out)
+                        if (stack.size() < 1) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype& vch = stacktop(-1);
+                        for (int i = 0; i < vch.size(); i++)
+                            vch[i] = ~vch[i];
+                    }
+                    break;
+
+                    case OP_AND:
+                    case OP_OR:
+                    case OP_XOR:
+                    {
+                        // (x1 x2 - out)
+                        if (stack.size() < 2) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+
+                        valtype& vch1 = stacktop(-2);
+                        valtype& vch2 = stacktop(-1);
+                        MakeSameSize(vch1, vch2);
+                        if (opcode == OP_AND)
+                        {
+                            for (int i = 0; i < vch1.size(); i++)
+                                vch1[i] &= vch2[i];
+                        }
+                        else if (opcode == OP_OR)
+                        {
+                            for (int i = 0; i < vch1.size(); i++)
+                                vch1[i] |= vch2[i];
+                        }
+                        else if (opcode == OP_XOR)
+                        {
+                            for (int i = 0; i < vch1.size(); i++)
+                                vch1[i] ^= vch2[i];
+                        }
+                        stack.pop_back();
+                    }
+                    break;
+
                     case OP_EQUAL:
                     case OP_EQUALVERIFY:
                         // case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
@@ -859,6 +909,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                     case OP_ADD:
                     case OP_SUB:
+                    case OP_MOD:
                     case OP_BOOLAND:
                     case OP_BOOLOR:
                     case OP_NUMEQUAL:
@@ -885,6 +936,14 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             case OP_SUB:
                                 bn = bn1 - bn2;
+                                break;
+
+                            case OP_MOD:
+                                if (bn2 == 0) {
+                                    return set_error(
+                                        serror, SCRIPT_ERR_MOD_BY_ZERO);
+                                }
+                                bn = bn1 % bn2;
                                 break;
 
                             case OP_BOOLAND:
@@ -1178,6 +1237,74 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                     serror, SCRIPT_ERR_CHECKMULTISIGVERIFY);
                             }
                         }
+                    } break;
+
+
+                    //
+                    // Crypto
+                    //
+                    case OP_CAT:
+                    {
+                        // (x1 x2 -- out)
+                        if (stack.size() < 2) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype& vch1 = stacktop(-2);
+                        valtype& vch2 = stacktop(-1);
+                        if (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                        }
+                        vch1.insert(vch1.end(), vch2.begin(), vch2.end());
+                        stack.pop_back();
+                    } break;
+
+                    case OP_SUBSTR:
+                    {
+                        // (in begin size -- out)
+                        if (stack.size() < 3) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype& vch = stacktop(-3);
+                        int64_t nBegin = CScriptNum(stacktop(-2), fRequireMinimal).getint();
+                        int64_t nEnd = nBegin + CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                        if (nBegin < 0 || nEnd < nBegin) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_SUBSTR_RANGE);
+                        }
+                        if (nBegin > vch.size())
+                            nBegin = vch.size();
+                        if (nEnd > vch.size())
+                            nEnd = vch.size();
+                        vch.erase(vch.begin() + nEnd, vch.end());
+                        vch.erase(vch.begin(), vch.begin() + nBegin);
+                        stack.pop_back();
+                        stack.pop_back();
+                    } break;
+
+                    case OP_LEFT:
+                    case OP_RIGHT:
+                    {
+                        // (in size -- out)
+                        if (stack.size() < 2) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype& vch = stacktop(-2);
+                        int64_t nSize = CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                        if (nSize < 0) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        if (nSize > vch.size()) {
+                            nSize = vch.size();
+                        }
+                        if (opcode == OP_LEFT)
+                            vch.erase(vch.begin() + nSize, vch.end());
+                        else
+                            vch.erase(vch.begin(), vch.end() - nSize);
+                        stack.pop_back();
                     } break;
 
                     default:
