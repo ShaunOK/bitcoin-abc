@@ -50,6 +50,8 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "Invalid modulo operation";
         case SCRIPT_ERR_INVALID_SUBSTR_RANGE:
             return "Invalid OP_SUBSTR range";
+        case SCRIPT_ERR_INVALID_INIT:
+            return "Invalid OP_INIT construction";
         case SCRIPT_ERR_NEGATIVE_LOCKTIME:
             return "Negative locktime";
         case SCRIPT_ERR_UNSATISFIED_LOCKTIME:
