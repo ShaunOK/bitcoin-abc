@@ -1322,13 +1322,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     case OP_BIN2NUM:
                     case OP_NUM2BIN:
                     {
-                        // (in -- out)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-
                         if (opcode == OP_BIN2NUM) {
+                            // (in -- out)
+                            if (stack.size() < 1) {
+                                return set_error(
+                                    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                            }
+
                             // input CScriptNum without any minimal encoding enforcement
                             int64_t num = CScriptNum(stacktop(-1), false).getint();
 
@@ -1353,6 +1353,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
 
                         if (opcode == OP_NUM2BIN) {
+                            // (in size -- out)
+                            if (stack.size() < 2) {
+                                return set_error(
+                                    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                            }
+
                             // ensure input is in canonical form
                             int64_t size = CScriptNum(stacktop(-2), fRequireMinimal).getint(); // used to build integer size
                             int64_t num = CScriptNum(stacktop(-1), fRequireMinimal).getint(); // inputted number to generate integer size
