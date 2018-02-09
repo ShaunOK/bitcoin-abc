@@ -5,6 +5,8 @@
 
 #include "interpreter.h"
 
+#include <arpa/inet.h>
+#include <limits.h>
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -44,15 +46,6 @@ bool CastToBool(const valtype &vch) {
         }
     }
     return false;
-}
-
-void MakeSameSize(valtype& vch1, valtype& vch2)
-{
-    // Lengthen the shorter one
-    if (vch1.size() < vch2.size())
-        vch1.resize(vch2.size(), 0);
-    if (vch2.size() < vch1.size())
-        vch2.resize(vch1.size(), 0);
 }
 
 /**
@@ -345,7 +338,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             }
 
             if (opcode == OP_2MUL || opcode == OP_2DIV || opcode == OP_MUL ||
-                opcode == OP_DIV  || opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
+                opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
                 // Disabled opcodes.
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
@@ -828,7 +821,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         valtype& vch1 = stacktop(-2);
                         valtype& vch2 = stacktop(-1);
-                        MakeSameSize(vch1, vch2);
+
+                        // throw error if inputs are not the same size
+                        if (vch1.size() != vch2.size()) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+                        }
+
                         if (opcode == OP_AND)
                         {
                             for (int i = 0; i < vch1.size(); i++)
@@ -926,6 +925,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                     case OP_ADD:
                     case OP_SUB:
+                    case OP_DIV:
                     case OP_MOD:
                     case OP_BOOLAND:
                     case OP_BOOLOR:
@@ -943,6 +943,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
+                        // first two inputs must be minimally encoded numbers
                         CScriptNum bn1(stacktop(-2), fRequireMinimal);
                         CScriptNum bn2(stacktop(-1), fRequireMinimal);
                         CScriptNum bn(0);
@@ -955,8 +956,18 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 bn = bn1 - bn2;
                                 break;
 
-                            case OP_MOD:
+                            case OP_DIV:
+                                // bn2 must not be 0
                                 if (bn2 == 0) {
+                                    return set_error(
+                                        serror, SCRIPT_ERR_DIV_BY_ZERO);
+                                }
+                                bn = bn1 % bn2;
+                                break;
+
+                            case OP_MOD:
+                                // 2nd operand must be positive
+                                if (bn2 <= 0) {
                                     return set_error(
                                         serror, SCRIPT_ERR_MOD_BY_ZERO);
                                 }
@@ -1276,52 +1287,109 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         stack.pop_back();
                     } break;
 
-                    case OP_SUBSTR:
+                    case OP_SPLIT:
                     {
-                        // (in begin size -- out)
-                        if (stack.size() < 3) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-                        valtype& vch = stacktop(-3);
-                        int64_t nBegin = CScriptNum(stacktop(-2), fRequireMinimal).getint();
-                        int64_t nEnd = nBegin + CScriptNum(stacktop(-1), fRequireMinimal).getint();
-                        if (nBegin < 0 || nEnd < nBegin) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_SUBSTR_RANGE);
-                        }
-                        if (nBegin > vch.size())
-                            nBegin = vch.size();
-                        if (nEnd > vch.size())
-                            nEnd = vch.size();
-                        vch.erase(vch.begin() + nEnd, vch.end());
-                        vch.erase(vch.begin(), vch.begin() + nBegin);
-                        stack.pop_back();
-                        stack.pop_back();
-                    } break;
-
-                    case OP_LEFT:
-                    case OP_RIGHT:
-                    {
-                        // (in size -- out)
+                        // (in position -- x1 x2)
                         if (stack.size() < 2) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
                         valtype& vch = stacktop(-2);
-                        int64_t nSize = CScriptNum(stacktop(-1), fRequireMinimal).getint();
-                        if (nSize < 0) {
+                        int64_t nPosition = CScriptNum(stacktop(-1), fRequireMinimal).getint();
+
+                        // if nPosition is less than 0 or is larger than the input then throw error
+                        if (nPosition < 0 || nPosition > vch.size()) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
+                        }
+
+                        // initialize outputs and pop inputs off stack
+                        valtype vchOut1;
+                        valtype vchOut2 = vch; // original input
+                        stack.pop_back();
+                        stack.pop_back();
+
+                        // insert range from vch into vchOut1 starting from left
+                        vchOut1.insert(vchOut1.begin(), vch.begin(), vch.begin() + nPosition);
+                        // vchOut2 erases characters starting from left
+                        vchOut2.erase(vch.begin(), vch.begin() + nPosition);
+
+                        // push to stack
+                        stack.push_back(vchOut1);
+                        stack.push_back(vchOut2);
+                    } break;
+
+                    case OP_BIN2NUM:
+                    case OP_NUM2BIN:
+                    {
+                        // (in -- out)
+                        if (stack.size() < 1) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        if (nSize > vch.size()) {
-                            nSize = vch.size();
+
+                        if (opcode == OP_BIN2NUM) {
+                            // input CScriptNum without any minimal encoding enforcement
+                            int64_t num = CScriptNum(stacktop(-1), false).getint();
+
+                            // check for underflow/overflow prior to casting as an int32_t
+                            if (num > INT_MAX || num < INT_MIN) {
+                                return set_error(
+                                    serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
+                            }
+
+                            // cast int64_t to int32_t
+                            static_cast<int32_t>(num);
+
+                            // convert into little endian order (maintains system agnosticism)
+                            htonl(num);
+
+                            // memcpy only 4 bytes into output
+                            std::vector<unsigned char> bytes;
+                            bytes.reserve(4);
+                            memcpy(&bytes, (void *)num, sizeof(bytes));
+                            stack.pop_back();
+                            stack.push_back(bytes);
                         }
-                        if (opcode == OP_LEFT)
-                            vch.erase(vch.begin() + nSize, vch.end());
-                        else
-                            vch.erase(vch.begin(), vch.end() - nSize);
-                        stack.pop_back();
+
+                        if (opcode == OP_NUM2BIN) {
+                            // ensure input is in canonical form
+                            int64_t size = CScriptNum(stacktop(-2), fRequireMinimal).getint(); // used to build integer size
+                            int64_t num = CScriptNum(stacktop(-1), fRequireMinimal).getint(); // inputted number to generate integer size
+
+                            // here we check if we can build a valid integer type from size
+                            if (size > MAX_NUM2BIN_SIZE || size <= 0 || size / 2 != 0) {
+                                return set_error(
+                                    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+                            }
+
+                            // check for underflow/overflow prior to casting as an int16_t in little endian
+                            if (size == 2) {
+                                if (num > SHRT_MAX || num < SHRT_MIN) {
+                                    return set_error(
+                                        serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+                                }
+                                static_cast<int16_t>(num);
+                                ntohl(num);
+                            }
+
+                            // check for underflow/overflow prior to casting as an int32_t in little endianm
+                            if (size == 4) {
+                                if (num > INT_MAX || num < INT_MIN) {
+                                    return set_error(
+                                        serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+                                }
+                                static_cast<int32_t>(num);
+                                ntohs(num);
+                            }
+
+                            // memcpy x bytes into output
+                            std::vector<unsigned char> bytes;
+                            bytes.reserve(size);
+                            memcpy(&bytes, (void *)num, sizeof(bytes));
+                            stack.pop_back();
+                            stack.push_back(bytes);
+                        }
                     } break;
 
                     default:
