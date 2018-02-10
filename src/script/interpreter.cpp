@@ -1344,10 +1344,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             // convert into little endian order (maintains system agnosticism)
                             uint32_t LEnum = htonl(num);
 
-                            // memcpy only 4 bytes into output
+                            // copy unsigned chars into byte vector
                             std::vector<unsigned char> bytes;
-                            bytes.reserve(4);
-                            memcpy(&bytes, (void *)LEnum, sizeof(bytes));
+                            bytes.resize(4);
+                            for (int i = 0; i < sizeof(bytes); i++) {
+                                bytes.at(i) = ((unsigned char *)(&LEnum))[i];
+                            }
+
                             stack.pop_back();
                             stack.push_back(bytes);
                         }
@@ -1377,6 +1380,15 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 }
                                 static_cast<int16_t>(num);
                                 uint16_t LEnum = ntohs(num);
+
+                                // copy unsigned chars into byte vector
+                                std::vector<unsigned char> bytes;
+                                bytes.resize(size);
+                                for (int i = 0; i < sizeof(bytes); i++) {
+                                    bytes.at(i) = ((unsigned char *)(&LEnum))[i];
+                                }
+                                stack.pop_back();
+                                stack.push_back(bytes);
                             }
 
                             // check for underflow/overflow prior to casting as an int32_t in little endianm
@@ -1387,14 +1399,16 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 }
                                 static_cast<int32_t>(num);
                                 uint32_t LEnum = ntohl(num);
-                            }
 
-                            // memcpy x bytes into output
-                            std::vector<unsigned char> bytes;
-                            bytes.reserve(size);
-                            memcpy(&bytes, (void *)LEnum, sizeof(bytes));
-                            stack.pop_back();
-                            stack.push_back(bytes);
+                                // copy unsigned chars into byte vector
+                                std::vector<unsigned char> bytes;
+                                bytes.resize(size);
+                                for (int i = 0; i < sizeof(bytes); i++) {
+                                    bytes.at(i) = ((unsigned char *)(&LEnum))[i];
+                                }
+                                stack.pop_back();
+                                stack.push_back(bytes);
+                            }
                         }
                     } break;
 
