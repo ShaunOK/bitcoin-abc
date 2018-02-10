@@ -962,7 +962,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                     return set_error(
                                         serror, SCRIPT_ERR_DIV_BY_ZERO);
                                 }
-                                bn = bn1 % bn2;
+                                bn = bn1 / bn2;
                                 break;
 
                             case OP_MOD:
@@ -1303,18 +1303,18 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
                         }
 
-                        // initialize outputs and pop inputs off stack
+                        // initialize outputs
                         valtype vchOut1;
                         valtype vchOut2 = vch; // original input
-                        stack.pop_back();
-                        stack.pop_back();
 
                         // insert range from vch into vchOut1 starting from left
                         vchOut1.insert(vchOut1.begin(), vch.begin(), vch.begin() + nPosition);
                         // vchOut2 erases characters starting from left
                         vchOut2.erase(vch.begin(), vch.begin() + nPosition);
 
-                        // push to stack
+                        // pop and push to stack
+                        stack.pop_back();
+                        stack.pop_back();
                         stack.push_back(vchOut1);
                         stack.push_back(vchOut2);
                     } break;
@@ -1342,12 +1342,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             static_cast<int32_t>(num);
 
                             // convert into little endian order (maintains system agnosticism)
-                            htonl(num);
+                            uint32_t LEnum = htonl(num);
 
                             // memcpy only 4 bytes into output
                             std::vector<unsigned char> bytes;
                             bytes.reserve(4);
-                            memcpy(&bytes, (void *)num, sizeof(bytes));
+                            memcpy(&bytes, (void *)LEnum, sizeof(bytes));
                             stack.pop_back();
                             stack.push_back(bytes);
                         }
@@ -1376,7 +1376,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                         serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                                 }
                                 static_cast<int16_t>(num);
-                                ntohl(num);
+                                uint16_t LEnum = ntohs(num);
                             }
 
                             // check for underflow/overflow prior to casting as an int32_t in little endianm
@@ -1386,13 +1386,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                         serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                                 }
                                 static_cast<int32_t>(num);
-                                ntohs(num);
+                                uint32_t LEnum = ntohl(num);
                             }
 
                             // memcpy x bytes into output
                             std::vector<unsigned char> bytes;
                             bytes.reserve(size);
-                            memcpy(&bytes, (void *)num, sizeof(bytes));
+                            memcpy(&bytes, (void *)LEnum, sizeof(bytes));
                             stack.pop_back();
                             stack.push_back(bytes);
                         }
