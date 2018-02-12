@@ -19,8 +19,8 @@ namespace {
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
-		BOOST_CHECK_EQUAL( r, false );
-		BOOST_CHECK_EQUAL( err, SCRIPT_ERR_INVALID_STACK_OPERATION );
+		BOOST_CHECK_EQUAL(r, false);
+		BOOST_CHECK_EQUAL(err, e);
 	}
 	void test(const CScript& script, stack_t stack, uint32_t flags, stack_t expected) {
 		ScriptError err;
@@ -51,7 +51,7 @@ namespace {
 		return ans;
 	}
 
-	void test(const CScript& script, vector<uint8_t> v, uint32_t flags) {
+	void test_num2bin(const CScript& script, vector<uint8_t> v, uint32_t flags) {
 		if (v.empty()) return;
 		if (v.size()>sizeof(uint8_t)) return;
 		for (uint8_t i=v.size(); i<MAX_NUM2BIN_SIZE; ++i) {
@@ -60,7 +60,9 @@ namespace {
 	}
 
 
-	void test(const CScript& script, uint32_t flags) {
+	void test_num2bin(uint32_t flags) {
+		CScript script;
+		script << OP_NUM2BIN;
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION); //empty stack
 		test(script,stack_t{{4}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION); //1 item stack
 		test(script,stack_t{{0x02},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size>MAX_NUM2BIN_SIZE
@@ -69,21 +71,54 @@ namespace {
 		test(script,stack_t{{0x02},{0}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size 0
 		test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size <0
 		test(script,stack_t{{0x85},{0}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size 0
-		test(script,{0x7f},flags);
-		test(script,{0x7f,0xff},flags);
-		test(script,{0x71,0x02},flags);
-		test(script,{0x7f,0xff,0xff},flags);
-		test(script,{0x71,0x02,0x03},flags);
-		test(script,{0x7f,0xff,0xff,0xff},flags);
-		test(script,{0x71,0x02,0x03,0x04},flags);
-		test(script,{0x81},flags);
-		test(script,{0x80,0x01},flags);
-		test(script,{0x81,0x02},flags);
-		test(script,{0x80,0x00,0x01},flags);
-		test(script,{0x81,0x02,0x03},flags);
-		test(script,{0x80,0x00,0x00,0x01},flags);
-		test(script,{0x81,0x02,0x03,0x04},flags);
+		test_num2bin(script,{0x7f},flags);
+		test_num2bin(script,{0x7f,0xff},flags);
+		test_num2bin(script,{0x71,0x02},flags);
+		test_num2bin(script,{0x7f,0xff,0xff},flags);
+		test_num2bin(script,{0x71,0x02,0x03},flags);
+		test_num2bin(script,{0x7f,0xff,0xff,0xff},flags);
+		test_num2bin(script,{0x71,0x02,0x03,0x04},flags);
+		test_num2bin(script,{0x81},flags);
+		test_num2bin(script,{0x80,0x01},flags);
+		test_num2bin(script,{0x81,0x02},flags);
+		test_num2bin(script,{0x80,0x00,0x01},flags);
+		test_num2bin(script,{0x81,0x02,0x03},flags);
+		test_num2bin(script,{0x80,0x00,0x00,0x01},flags);
+		test_num2bin(script,{0x81,0x02,0x03,0x04},flags);
 	}
+
+
+	void test_bin2num(uint32_t flags) {
+		CScript script;
+		script << OP_BIN2NUM;
+/*
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION); //empty stack
+		test(script,stack_t{{0xffffffffffffffff}},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION); //2 item stack, positive, size>MAX_NUM2BIN_SIZE
+		test(script,stack_t{{INT_MAX+1}},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION); //2 item stack, positive, size>MAX_NUM2BIN_SIZE
+
+
+		test(script,stack_t{{0x85},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size>MAX_NUM2BIN_SIZE
+		test(script,stack_t{{0x02},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size <0
+		test(script,stack_t{{0x02},{0}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size 0
+		test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size <0
+		test(script,stack_t{{0x85},{0}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size 0
+		test_num2bin(script,{0x7f},flags);
+		test_num2bin(script,{0x7f,0xff},flags);
+		test_num2bin(script,{0x71,0x02},flags);
+		test_num2bin(script,{0x7f,0xff,0xff},flags);
+		test_num2bin(script,{0x71,0x02,0x03},flags);
+		test_num2bin(script,{0x7f,0xff,0xff,0xff},flags);
+		test_num2bin(script,{0x71,0x02,0x03,0x04},flags);
+		test_num2bin(script,{0x81},flags);
+		test_num2bin(script,{0x80,0x01},flags);
+		test_num2bin(script,{0x81,0x02},flags);
+		test_num2bin(script,{0x80,0x00,0x01},flags);
+		test_num2bin(script,{0x81,0x02,0x03},flags);
+		test_num2bin(script,{0x80,0x00,0x00,0x01},flags);
+		test_num2bin(script,{0x81,0x02,0x03,0x04},flags);
+*/
+	}
+
 }
 
 
@@ -92,14 +127,18 @@ namespace {
 //BOOST_FIXTURE_TEST_SUITE(op_code, op_code_test)
 BOOST_AUTO_TEST_SUITE(op_code)
 
-
 BOOST_AUTO_TEST_CASE(op_num2bin) {
-	CScript script;
-	script << OP_NUM2BIN;
-	test(script, 0);
-	test(script, STANDARD_SCRIPT_VERIFY_FLAGS);
-	test(script, STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
-	test(script, STANDARD_LOCKTIME_VERIFY_FLAGS);
+	test_num2bin(0);
+	test_num2bin(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_num2bin(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_num2bin(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+
+BOOST_AUTO_TEST_CASE(op_bin2num) {
+	test_bin2num(0);
+	test_bin2num(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_bin2num(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
 
 
