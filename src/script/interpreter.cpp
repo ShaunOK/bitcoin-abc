@@ -336,13 +336,11 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
-/*
             if (opcode == OP_2MUL || opcode == OP_2DIV || opcode == OP_MUL ||
                 opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
                 // Disabled opcodes.
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
-*/
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
                 if (fRequireMinimal &&
                     !CheckMinimalPush(vchPushValue, opcode)) {
