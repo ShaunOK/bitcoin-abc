@@ -1306,16 +1306,19 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         valtype vchOut1;
                         valtype vchOut2 = vch; // original input
 
-                        // insert range from vch into vchOut1 starting from left
-                        vchOut1.insert(vchOut1.begin(), vch.begin(), vch.begin() + nPosition);
-                        // vchOut2 erases characters starting from left
-                        vchOut2.erase(vch.begin(), vch.begin() + nPosition);
+                        // only execute if nPosition > 0
+                        if (nPosition != 0) {
+                            // insert range from vch into vchOut1 starting from left
+                            vchOut1.insert(vchOut1.begin(), vch.begin(), vch.begin() + nPosition - 1);
+                            // vchOut2 erases characters starting from left
+                            vchOut2.erase(vch.begin(), vch.begin() + nPosition);
+                        }
 
                         // pop and push to stack
                         stack.pop_back();
                         stack.pop_back();
-                        stack.push_back(vchOut1);
                         stack.push_back(vchOut2);
+                        stack.push_back(vchOut1);
                     } break;
 
                     case OP_BIN2NUM:
