@@ -876,22 +876,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             }
                         }
                         break;
-
-                    case OP_LSHIFT:
-                    case OP_RSHIFT:
-                    case OP_2MUL:
-                    case OP_2DIV: {
-                        switch (opcode) {
-                            case OP_2MUL:
-                                bn << 1;
-                                break;
-                            case OP_2DIV:
-                                bn >> 1;
-                                break;
-			}
-
-
-		    } break;
                     //
                     // Numeric
                     //
@@ -950,8 +934,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     case OP_LESSTHANOREQUAL:
                     case OP_GREATERTHANOREQUAL:
                     case OP_MIN:
-                    case OP_MAX:
-                    case OP_MUL: {
+                    case OP_MAX: {
                         // (x1 x2 -- out)
                         if (stack.size() < 2) {
                             return set_error(
@@ -977,9 +960,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                         serror, SCRIPT_ERR_DIV_BY_ZERO);
                                 }
                                 bn = bn1 / bn2;
-                                break;
-                            case OP_MUL:
-                                bn = bn1 * bn2;
                                 break;
                             case OP_MOD:
                                 // 2nd operand must be positive
@@ -1025,12 +1005,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 break;
                             case OP_2MUL:
                                 bn = (bn1 > bn2 ? bn1 : bn2);
-                                break;
-                            case OP_LSHIFT:
-                                bn = bn1 << bn2;
-                                break;
-                            case OP_RSHIFT:
-                                bn = bn1 >> bn2;
                                 break;
                             default:
                                 assert(!"invalid opcode");
@@ -1323,7 +1297,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         int64_t nPosition = CScriptNum(stacktop(-1), fRequireMinimal).getint();
 
                         // if nPosition is less than 0 or is larger than the input then throw error
-                        if (nPosition < 0 || nPosition > vch.size()) {
+                        if (nPosition < 0 || (size_t)nPosition > vch.size()) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
                         }
@@ -1372,7 +1346,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             // copy unsigned chars into byte vector
                             std::vector<unsigned char> bytes;
                             bytes.resize(4);
-                            for (int i = 0; i < sizeof(bytes); i++) {
+                            for (size_t i = 0; i < bytes.size(); i++) {
                                 bytes.at(i) = ((unsigned char *)(&LEnum))[i];
                             }
 
@@ -1403,13 +1377,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                     return set_error(
                                         serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                                 }
-                                static_cast<int16_t>(num);
+                                num=static_cast<int16_t>(num);
                                 uint16_t LEnum = ntohs(num);
 
                                 // copy unsigned chars into byte vector
                                 std::vector<unsigned char> bytes;
                                 bytes.resize(size);
-                                for (int i = 0; i < sizeof(bytes); i++) {
+                                for (size_t i = 0; i < bytes.size(); i++) {
                                     bytes.at(i) = ((unsigned char *)(&LEnum))[i];
                                 }
                                 stack.pop_back();
@@ -1422,13 +1396,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                     return set_error(
                                         serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                                 }
-                                static_cast<int32_t>(num);
+                                num=static_cast<int32_t>(num);
                                 uint32_t LEnum = ntohl(num);
 
                                 // copy unsigned chars into byte vector
                                 std::vector<unsigned char> bytes;
                                 bytes.resize(size);
-                                for (int i = 0; i < sizeof(bytes); i++) {
+                                for (size_t i = 0; i < bytes.size(); i++) {
                                     bytes.at(i) = ((unsigned char *)(&LEnum))[i];
                                 }
                                 stack.pop_back();
