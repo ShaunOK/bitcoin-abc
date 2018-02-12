@@ -336,13 +336,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
-
+/*
             if (opcode == OP_2MUL || opcode == OP_2DIV || opcode == OP_MUL ||
                 opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
                 // Disabled opcodes.
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
-
+*/
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
                 if (fRequireMinimal &&
                     !CheckMinimalPush(vchPushValue, opcode)) {
@@ -804,7 +804,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
                         valtype& vch = stacktop(-1);
-                        for (int i = 0; i < vch.size(); i++)
+                        for (size_t i = 0; i < vch.size(); i++)
                             vch[i] = ~vch[i];
                     }
                     break;
@@ -830,17 +830,17 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         if (opcode == OP_AND)
                         {
-                            for (int i = 0; i < vch1.size(); i++)
+                            for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] &= vch2[i];
                         }
                         else if (opcode == OP_OR)
                         {
-                            for (int i = 0; i < vch1.size(); i++)
+                            for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] |= vch2[i];
                         }
                         else if (opcode == OP_XOR)
                         {
-                            for (int i = 0; i < vch1.size(); i++)
+                            for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] ^= vch2[i];
                         }
                         stack.pop_back();
@@ -879,6 +879,21 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                         break;
 
+                    case OP_LSHIFT:
+                    case OP_RSHIFT:
+                    case OP_2MUL:
+                    case OP_2DIV: {
+                        switch (opcode) {
+                            case OP_2MUL:
+                                bn << 1;
+                                break;
+                            case OP_2DIV:
+                                bn >> 1;
+                                break;
+			}
+
+
+		    } break;
                     //
                     // Numeric
                     //
@@ -937,7 +952,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     case OP_LESSTHANOREQUAL:
                     case OP_GREATERTHANOREQUAL:
                     case OP_MIN:
-                    case OP_MAX: {
+                    case OP_MAX:
+                    case OP_MUL: {
                         // (x1 x2 -- out)
                         if (stack.size() < 2) {
                             return set_error(
@@ -964,7 +980,9 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 }
                                 bn = bn1 / bn2;
                                 break;
-
+                            case OP_MUL:
+                                bn = bn1 * bn2;
+                                break;
                             case OP_MOD:
                                 // 2nd operand must be positive
                                 if (bn2 <= 0) {
@@ -1006,6 +1024,15 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 break;
                             case OP_MAX:
                                 bn = (bn1 > bn2 ? bn1 : bn2);
+                                break;
+                            case OP_2MUL:
+                                bn = (bn1 > bn2 ? bn1 : bn2);
+                                break;
+                            case OP_LSHIFT:
+                                bn = bn1 << bn2;
+                                break;
+                            case OP_RSHIFT:
+                                bn = bn1 >> bn2;
                                 break;
                             default:
                                 assert(!"invalid opcode");
@@ -1339,7 +1366,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             }
 
                             // cast int64_t to int32_t
-                            static_cast<int32_t>(num);
+                            num=static_cast<int32_t>(num);
 
                             // convert into little endian order (maintains system agnosticism)
                             uint32_t LEnum = htonl(num);
