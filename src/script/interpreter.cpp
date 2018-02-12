@@ -1365,14 +1365,21 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             }
 
                             // ensure input is in canonical form
-                            int64_t size = CScriptNum(stacktop(-2), fRequireMinimal).getint(); // used to build integer size
-                            int64_t num = CScriptNum(stacktop(-1), fRequireMinimal).getint(); // inputted number to generate integer size
+                            int64_t num = CScriptNum(stacktop(-2), fRequireMinimal).getint(); // used to build integer size
+                            int64_t size = CScriptNum(stacktop(-1), fRequireMinimal).getint(); // inputted number to generate integer size
 
                             // here we check if we can build a valid integer type from size
-                            if (size > MAX_NUM2BIN_SIZE || size <= 0 || size / 2 != 0) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-                            }
+							#if(MAX_NUM2BIN_SIZE<MAX_SCRIPT_ELEMENT_SIZE)
+		                        if (size > MAX_NUM2BIN_SIZE || size <= 0) {
+		                            return set_error(
+		                                serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		                        }
+							#else
+		                        if (size > MAX_SCRIPT_ELEMENT_SIZE || size <= 0) {
+		                            return set_error(
+		                                serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		                        }
+							#endif
 
                             // check for underflow/overflow prior to casting as an int16_t in little endian
                             if (size == 2) {
