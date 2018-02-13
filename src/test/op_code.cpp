@@ -19,6 +19,7 @@ namespace {
 	typedef vector<item> stack_t;
 
 	void print(const item& i) {
+		if (i.empty()) cout << "empty" << endl;
 		for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
 		cout << endl;
 	}
