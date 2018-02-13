@@ -1293,18 +1293,35 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        valtype& vch = stacktop(-2);
+                        valtype vch = stacktop(-2);
                         int64_t nPosition = CScriptNum(stacktop(-1), fRequireMinimal).getint();
 
                         // if nPosition is less than 0 or is larger than the input then throw error
-                        if (nPosition < 0 || (size_t)nPosition > vch.size()) {
+                        if (nPosition < 0 || static_cast<size_t>(nPosition) > vch.size()) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
                         }
 
+                        stack.pop_back();
+                        stack.pop_back();
+
                         // initialize outputs
-                        valtype vchOut1;
-                        valtype vchOut2 = vch; // original input
+			if (nPosition == 0) {
+		                stack.push_back(valtype());
+		                stack.push_back(vch);
+			}
+			else if (static_cast<size_t>(nPosition) == vch.size()) {
+		                stack.push_back(vch);
+		                stack.push_back(valtype());
+			}
+			else {
+		                valtype vchOut1, vchOut2;
+				vchOut1.insert(vchOut1.end(), vch.begin(), vch.begin() + nPosition);
+				vchOut2.insert(vchOut2.end(), vch.begin() + nPosition, vch.end());
+		                stack.emplace_back(move(vchOut1));
+		                stack.emplace_back(move(vchOut2));
+			}
+			
 
                         // only execute if nPosition > 0
 /*
@@ -1316,10 +1333,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
 */
                         // pop and push to stack
-                        stack.pop_back();
-                        stack.pop_back();
-                        stack.push_back(vchOut2);
-                        stack.push_back(vchOut1);
                     } break;
 
                     case OP_BIN2NUM:

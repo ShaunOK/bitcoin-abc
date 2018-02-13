@@ -19,7 +19,7 @@ namespace {
 	typedef vector<item> stack_t;
 
 	void print(const item& i) {
-		if (i.empty()) cout << "empty" << endl;
+		if (i.empty()) cout << "empty";
 		for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
 		cout << endl;
 	}
@@ -263,7 +263,7 @@ cout << "neg: " << neg << endl;
 		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x05}},flags,SCRIPT_ERR_INVALID_SPLIT_RANGE);
 
 		//if n < 0 the operator must fail.
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{0xff,0xff,0xff,0xff}},flags,SCRIPT_ERR_INVALID_SPLIT_RANGE);
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x81}},flags,SCRIPT_ERR_INVALID_SPLIT_RANGE);
 
 
 		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x01}},flags,stack_t{{0x01},{0x02,0x03,0x04}});
@@ -274,11 +274,8 @@ cout << "neg: " << neg << endl;
 		//split of a max-len item
 		{
 		item maxlength_item(MAX_SCRIPT_ELEMENT_SIZE, 0x00);
-		test(script,stack_t{maxlength_item,{0x00}},flags,stack_t{{},maxlength_item});
-		item illegal_item(MAX_SCRIPT_ELEMENT_SIZE+1, 0x00);
-		test(script,stack_t{maxlength_item,{0x00}},flags,SCRIPT_ERR_PUSH_SIZE);
+		test(script,stack_t{maxlength_item,{}},flags,stack_t{{},maxlength_item});
 		}
-		
 
 
 	}
@@ -287,7 +284,8 @@ cout << "neg: " << neg << endl;
 		CScript script;
 		script << OP_SPLIT << OP_CAT;
 		// x n OP_SPLIT OP_CAT -> x - for all x and for all 0 <= n <= len(x)
-		for (uint8_t i=0; i<=x.size(); ++i) {
+		test(script,stack_t{x,{}},flags,stack_t{x});
+		for (uint8_t i=1; i<=x.size(); ++i) {
 			test(script,stack_t{x,{i}},flags,stack_t{x});
 		}
 	}
@@ -576,7 +574,7 @@ BOOST_AUTO_TEST_CASE(op_xor) {
 	test_xor(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_xor(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
-
+/*
 BOOST_AUTO_TEST_CASE(op_div) {
 	test_div(0);
 	test_div(STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -604,7 +602,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num) {
 	test_bin2num(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
-
+*/
 BOOST_AUTO_TEST_SUITE_END()
 
 
