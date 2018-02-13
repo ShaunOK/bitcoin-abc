@@ -28,10 +28,16 @@ namespace {
 		cout << endl;
 	}
 	void test(const CScript& script, stack_t stack, uint32_t flags, ScriptError e) {
+cout << "--------------" << endl;
+cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
+cout << "with input stack: " << endl;
+print(stack);
+cout << "expected error: " << e << endl;
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
 		BOOST_CHECK_EQUAL(r, false);
+cout << "got error: " << err << endl;
 		BOOST_CHECK_EQUAL(err, e);
 	}
 	void test(const CScript& script, stack_t stack, uint32_t flags, stack_t expected) {
@@ -97,6 +103,7 @@ cout << "--------------" << endl;
 		test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size <0
 		test(script,stack_t{{0x85},{0}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size 0
 		test_num2bin(script,{0x7f},flags);
+
 		test_num2bin(script,{0xff,0x7f},flags); //LE for 0x7FFF
 		test_num2bin(script,{0x02,0x71},flags);
 		test_num2bin(script,{0xff,0xff,0x7f},flags);
@@ -165,6 +172,7 @@ cout << "neg: " << neg << endl;
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
 		test(script,stack_t{mk_bin(0)},flags,stack_t{{}});
 		test(script,stack_t{mk_bin((int64_t)INT_MAX+1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
+
 		test(script,stack_t{mk_bin((int64_t)INT_MIN-1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
 		test(script,stack_t{mk_bin((int64_t)INT_MAX)},flags,stack_t{mk_bin((int64_t)INT_MAX)});
 		test(script,stack_t{mk_bin((int64_t)INT_MIN)},flags,stack_t{mk_bin((int64_t)INT_MIN)});
@@ -291,39 +299,116 @@ cout << "neg: " << neg << endl;
 		test_cat_split({0x01,0x02,0x03},flags);
 	}
 
+	void test_bitwiseop(const CScript& script, uint32_t flags) {
+
+		//number of inputs
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+		//where len(x1) == 0 == len(x2) the output will be an empty array.
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+
+		//operation fails when length of operands not equal
+		test(script,stack_t{{0x01},{}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{0x01,0x01},{}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{},{0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{},{0x01,0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{0x01},{0x01,0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{0x01,0x01},{0x01,0x01,0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{0x01,0x01},{0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+		test(script,stack_t{{0x01,0x01,0x01},{0x01,0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+	}
+
+
 	void test_and(uint32_t flags) {
 		CScript script;
 		script << OP_AND;
+		test_bitwiseop(script,flags);
+		test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00}});
+		test(script,stack_t{{0x00},{0x01}},flags,stack_t{{0x00}});
+		test(script,stack_t{{0x01},{0x00}},flags,stack_t{{0x00}});
+		test(script,stack_t{{0x01},{0x01}},flags,stack_t{{0x01}});
 
-		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x00,0x00},{0x00,0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x00,0x00},{0x01,0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x00,0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x01,0x00}},flags,stack_t{{0x01,0x00}});
 
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x01);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xF0);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x01 & 0xF0);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
 
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x3C);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xDB);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C & 0xDB);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
+
+		
 	}
 	void test_or(uint32_t flags) {
 		CScript script;
 		script << OP_OR;
+		test_bitwiseop(script,flags);
 
-		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00}});
+		test(script,stack_t{{0x00},{0x01}},flags,stack_t{{0x01}});
+		test(script,stack_t{{0x01},{0x00}},flags,stack_t{{0x01}});
+		test(script,stack_t{{0x01},{0x01}},flags,stack_t{{0x01}});
 
+		test(script,stack_t{{0x00,0x00},{0x00,0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x00,0x00},{0x01,0x00}},flags,stack_t{{0x01,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x00,0x00}},flags,stack_t{{0x01,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x01,0x00}},flags,stack_t{{0x01,0x00}});
+
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x01);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xF0);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x01 | 0xF0);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
+
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x3C);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xDB);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C | 0xDB);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
 
 	}
 	void test_xor(uint32_t flags) {
 		CScript script;
 		script << OP_XOR;
+		test_bitwiseop(script,flags);
 
-		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00}});
+		test(script,stack_t{{0x00},{0x01}},flags,stack_t{{0x01}});
+		test(script,stack_t{{0x01},{0x00}},flags,stack_t{{0x01}});
+		test(script,stack_t{{0x01},{0x01}},flags,stack_t{{0x00}});
+
+		test(script,stack_t{{0x00,0x00},{0x00,0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x00,0x00},{0x01,0x00}},flags,stack_t{{0x01,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x00,0x00}},flags,stack_t{{0x01,0x00}});
+		test(script,stack_t{{0x01,0x00},{0x01,0x00}},flags,stack_t{{0x00,0x00}});
+
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x01);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xF0);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x01 ^ 0xF0);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
+
+		{
+		item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x3C);
+		item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xDB);
+		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C ^ 0xDB);
+		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+		}
 
 
 	}
@@ -332,23 +417,116 @@ cout << "neg: " << neg << endl;
 		script << OP_DIV;
 
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+		test(script,stack_t{{}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-
+		//test not valid numbers
+		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		test(script,stack_t{{0x01,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		//b == 0 ; b is equal to any type of zero
+		test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		test(script,stack_t{{},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		test(script,stack_t{{},{0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		test(script,stack_t{{},{0x00,0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		
+		//185377af/85f41b01 =0
+		//185377af/00001b01 =E69D
+		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b,0xf4,0x85}},flags,stack_t{{}});
+		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b}},flags,stack_t{{0x9D,0xE6}});
+		//15/4 =3
+		//15/-4 =-3
+		//-15/4 =-3
+		//-15/-4 =3
+		test(script,stack_t{{0x0f},{0x04}},flags,stack_t{{0x03}});
+		test(script,stack_t{{0x0f},{0x84}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0x8f},{0x04}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0x8f},{0x84}},flags,stack_t{{0x03}});
+		//15000/4 =3750
+		//15000/-4 =-3750
+		//-15000/4 =-3750
+		//-15000/-4 =3750
+		test(script,stack_t{{0x98,0x3a},{0x04}},flags,stack_t{{0xa6,0x0e}});
+		test(script,stack_t{{0x98,0x3a},{0x84}},flags,stack_t{{0xa6,0x8e}});
+		test(script,stack_t{{0x98,0xba},{0x04}},flags,stack_t{{0xa6,0x8e}});
+		test(script,stack_t{{0x98,0xba},{0x84}},flags,stack_t{{0xa6,0x0e}});
+		//15000/4000 =3
+		//15000/-4000 =-3
+		//-15000/4000 =-3
+		//-15000/-4000 =3
+		test(script,stack_t{{0x98,0x3a},{0xa0,0x0f}},flags,stack_t{{0x03}});
+		test(script,stack_t{{0x98,0x3a},{0xa0,0x8f}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0x98,0xba},{0xa0,0x0f}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0x98,0xba},{0xa0,0x8f}},flags,stack_t{{0x03}});
+		//15000000/4000 =3750
+		//15000000/-4000 =-3750
+		//-15000000/4000 =-3750
+		//-15000000/-4000 =3750
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x0f}},flags,stack_t{{0x03}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x8f}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x0f}},flags,stack_t{{0x83}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0xa0,0x8f}},flags,stack_t{{0x03}});
+		//15000000/4 =3750000
+		//15000000/-4 =-3750000
+		//-15000000/4 =-3750000
+		//-15000000/-4 =3750000
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x04}},flags,stack_t{{0x70,0x38,0x39}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x84}},flags,stack_t{{0x70,0x38,0xb9}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x04}},flags,stack_t{{0x70,0x38,0xb9}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0x84}},flags,stack_t{{0x70,0x38,0x39}});
 	}
 	void test_mod(uint32_t flags) {
 		CScript script;
 		script << OP_MOD;
 
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{{},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
-		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+		test(script,stack_t{{}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
 
+		//test not valid numbers
+		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		test(script,stack_t{{0x01,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+
+		//div by 0
+		test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+
+		//56488123%321 =148
+		//56488123%3 =1
+		//56488123%564881230 =56488123
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x41,0x01}},flags,stack_t{{0x94,0x00}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x03}},flags,stack_t{{0x01}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0xbb,0xf0,0x5d,0x03}});
+
+		//56488123%-321 =-173
+		//56488123%-3 =-2
+		//56488123%-564881230 =-508393107
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x41,0x81}},flags,stack_t{{0xad,0x80}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x83}},flags,stack_t{{0x82}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x4e,0x67,0xab,0xa1}},flags,stack_t{{0x93,0x76,0x4d,0x9e}});
+
+		//-56488123%-321 =-148
+		//-56488123%-3 =-1
+		//-56488123%-564881230 =-56488123
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x81}},flags,stack_t{{0x94,0x80}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x83}},flags,stack_t{{0x81}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0xa1}},flags,stack_t{{0xbb,0xf0,0x5d,0x83}});
+
+		//-56488123%321 = 173
+		//-56488123%3 = 2
+		//-56488123%564881230 = 508393107
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x01}},flags,stack_t{{0xad,0x00}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x03}},flags,stack_t{{0x02}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0x93,0x76,0x4d,0x1e}});
+
+/*
+BaseSignatureChecker sigchecker;
+CScript s;
+s << -56488123 << 321 << 173 << 3 << 2 << 564881230 << 508393107;
+cout << FormatScript(s) << endl;
+stack_t t;
+bool r=EvalScript(t, s, 0, sigchecker, 0);
+print(t);
+exit(0);
+*/
 
 	}
 
@@ -384,30 +562,35 @@ BOOST_AUTO_TEST_CASE(op_and) {
 	test_and(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_and(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+
 BOOST_AUTO_TEST_CASE(op_or) {
 	test_or(0);
 	test_or(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_or(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_or(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+
 BOOST_AUTO_TEST_CASE(op_xor) {
 	test_xor(0);
 	test_xor(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_xor(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_xor(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+
 BOOST_AUTO_TEST_CASE(op_div) {
 	test_div(0);
 	test_div(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_div(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_div(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+
 BOOST_AUTO_TEST_CASE(op_mod) {
 	test_mod(0);
 	test_mod(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_mod(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_mod(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+
 BOOST_AUTO_TEST_CASE(op_num2bin) {
 	test_num2bin(0);
 	test_num2bin(STANDARD_SCRIPT_VERIFY_FLAGS);
