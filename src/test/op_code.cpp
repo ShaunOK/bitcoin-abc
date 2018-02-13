@@ -23,12 +23,10 @@ namespace {
 		for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
 		cout << endl;
 	}
-
 	void print(const stack_t& i) {
 		for (auto& s:i) print(s);
 		cout << endl;
 	}
-
 	void test(const CScript& script, stack_t stack, uint32_t flags, ScriptError e) {
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
@@ -172,7 +170,6 @@ cout << "neg: " << neg << endl;
 		test(script,stack_t{mk_bin((int64_t)INT_MIN)},flags,stack_t{mk_bin((int64_t)INT_MIN)});
 
 	}
-
 
 	void test_cat(uint32_t flags) {
 		CScript script;
@@ -424,7 +421,6 @@ BOOST_AUTO_TEST_CASE(op_bin2num) {
 	test_bin2num(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
-*/
 
 BOOST_AUTO_TEST_SUITE_END()
 

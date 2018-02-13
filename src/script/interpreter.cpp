@@ -1332,93 +1332,40 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                     serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                             }
 
-                            // input CScriptNum without any minimal encoding enforcement
                             int64_t num = CScriptNum(stacktop(-1), false).getint();
-
-                            // check for underflow/overflow prior to casting as an int32_t
                             if (num > INT_MAX || num < INT_MIN) {
                                 return set_error(
                                     serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
                             }
 
-                            // cast int64_t to int32_t
-                            num=static_cast<int32_t>(num);
 
-                            // convert into little endian order (maintains system agnosticism)
-                            uint32_t LEnum = htonl(num);
-
-                            // copy unsigned chars into byte vector
-                            std::vector<unsigned char> bytes;
-                            bytes.resize(4);
-                            for (size_t i = 0; i < bytes.size(); i++) {
-                                bytes.at(i) = ((unsigned char *)(&LEnum))[i];
-                            }
-
+                            CScriptNum bn(num);
                             stack.pop_back();
-                            stack.push_back(bytes);
+                            stack.push_back(bn.getvch());
                         }
 
                         if (opcode == OP_NUM2BIN) {
                             // (in size -- out)
-                            if (stack.size() < 2) {
+                            if (stack.empty() || stack.size() < 2) {
                                 return set_error(
                                     serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                             }
 
-                            // ensure input is in canonical form
-                            int64_t num = CScriptNum(stacktop(-2), fRequireMinimal).getint(); // used to build integer size
-                            int64_t size = CScriptNum(stacktop(-1), fRequireMinimal).getint(); // inputted number to generate integer size
+                            int64_t size = CScriptNum(stacktop(-2), true).getint();
+                            int64_t num = CScriptNum(stacktop(-1), false).getint();
 
-                            // here we check if we can build a valid integer type from size
-							#if(MAX_NUM2BIN_SIZE<MAX_SCRIPT_ELEMENT_SIZE)
-		                        if (size > MAX_NUM2BIN_SIZE || size <= 0) {
-		                            return set_error(
-		                                serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-		                        }
-							#else
-		                        if (size > MAX_SCRIPT_ELEMENT_SIZE || size <= 0) {
-		                            return set_error(
-		                                serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-		                        }
-							#endif
+                            CScriptNum bn(num);
+                            valtype output = bn.getvch();
 
-                            // check for underflow/overflow prior to casting as an int16_t in little endian
-                            if (size == 2) {
-                                if (num > SHRT_MAX || num < SHRT_MIN) {
-                                    return set_error(
-                                        serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-                                }
-                                num=static_cast<int16_t>(num);
-                                uint16_t LEnum = ntohs(num);
-
-                                // copy unsigned chars into byte vector
-                                std::vector<unsigned char> bytes;
-                                bytes.resize(size);
-                                for (size_t i = 0; i < bytes.size(); i++) {
-                                    bytes.at(i) = ((unsigned char *)(&LEnum))[i];
-                                }
-                                stack.pop_back();
-                                stack.push_back(bytes);
+                            if (size > 4 || size <= 0 || size > output.size()) {
+                                return set_error(
+                                    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                             }
+                            output.resize(size);
 
-                            // check for underflow/overflow prior to casting as an int32_t in little endianm
-                            if (size == 4) {
-                                if (num > INT_MAX || num < INT_MIN) {
-                                    return set_error(
-                                        serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-                                }
-                                num=static_cast<int32_t>(num);
-                                uint32_t LEnum = ntohl(num);
-
-                                // copy unsigned chars into byte vector
-                                std::vector<unsigned char> bytes;
-                                bytes.resize(size);
-                                for (size_t i = 0; i < bytes.size(); i++) {
-                                    bytes.at(i) = ((unsigned char *)(&LEnum))[i];
-                                }
-                                stack.pop_back();
-                                stack.push_back(bytes);
-                            }
+                            stack.pop_back();
+                            stack.pop_back();
+                            stack.push_back(output);
                         }
                     } break;
 
