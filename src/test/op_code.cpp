@@ -7,6 +7,7 @@
 #include "script/script.h"
 #include "script/interpreter.h"
 #include "policy/policy.h"
+#include "core_io.h"
 #include <boost/test/unit_test.hpp>
 #include <iostream>
 #include <iomanip>
@@ -21,12 +22,12 @@ namespace {
 		for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
 		cout << endl;
 	}
-/*
+
 	void print(const stack_t& i) {
 		for (auto& s:i) print(s);
 		cout << endl;
 	}
-*/
+
 	void test(const CScript& script, stack_t stack, uint32_t flags, ScriptError e) {
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
@@ -35,12 +36,23 @@ namespace {
 		BOOST_CHECK_EQUAL(err, e);
 	}
 	void test(const CScript& script, stack_t stack, uint32_t flags, stack_t expected) {
+cout << "--------------" << endl;
+cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
+cout << "with input stack: " << endl;
+print(stack);
+cout << "expected output stack: " << endl;
+print(expected);
+
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
+cout << "got output stack: " << endl;
+print(stack);
+
 		BOOST_CHECK_EQUAL(r, true);
 		BOOST_CHECK_EQUAL(err, SCRIPT_ERR_OK);
 		BOOST_CHECK_EQUAL(stack==expected, true);
+cout << "--------------" << endl;
 	}
 
 	vector<uint8_t> make_ev(vector<uint8_t> v, size_t sz) { //v contains a num in LE
@@ -103,6 +115,7 @@ namespace {
 
 
 	item mk_bin(int64_t v0) {
+		cout << endl << "mk_bin:" << endl;
 		if (v0==0) return item{0x00};
 		cout << "item:" << hex << v0 << endl;
 		uint64_t v=htole64(v0); 
@@ -159,14 +172,146 @@ cout << "neg: " << neg << endl;
 
 	}
 
+
+	void test_cat(uint32_t flags) {
+		CScript script;
+		script << OP_CAT;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x00}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00,0x00}});
+		test(script,stack_t{{0x01},{0x02}},flags,stack_t{{0x01,0x02}});
+
+	}
+
+	void test_split(uint32_t flags) {
+		CScript script;
+		script << OP_SPLIT;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{},{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{},{0x01}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{},{0x01,0x02,0x03,0x04}});
+
+		test(script,stack_t{{0x01},{0x01}},flags,stack_t{{0x01},{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x01}},flags,stack_t{{0x01},{0x02,0x03,0x04}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x02}},flags,stack_t{{0x01,0x02},{0x03,0x04}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x03}},flags,stack_t{{0x01,0x02,0x03},{0x04}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x04}},flags,stack_t{{0x01,0x02,0x03,0x04},{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{0x05}},flags,SCRIPT_ERR_INVALID_SPLIT_RANGE);
+
+	}
+
+	void test_and(uint32_t flags) {
+		CScript script;
+		script << OP_AND;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+
+
+	}
+	void test_or(uint32_t flags) {
+		CScript script;
+		script << OP_OR;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+
+
+	}
+	void test_xor(uint32_t flags) {
+		CScript script;
+		script << OP_XOR;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+
+
+	}
+	void test_div(uint32_t flags) {
+		CScript script;
+		script << OP_DIV;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+
+
+	}
+	void test_mod(uint32_t flags) {
+		CScript script;
+		script << OP_MOD;
+
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x01}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01},{}},flags,stack_t{{}});
+		test(script,stack_t{{0x01,0x02,0x03,0x04},{}},flags,stack_t{{}});
+
+
+	}
+
 }
-
-
-
 
 //BOOST_FIXTURE_TEST_SUITE(op_code, op_code_test)
 BOOST_AUTO_TEST_SUITE(op_code)
 
+BOOST_AUTO_TEST_CASE(op_cat) {
+	test_cat(0);
+	test_cat(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_cat(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_cat(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+
+BOOST_AUTO_TEST_CASE(op_split) {
+	test_split(0);
+	test_split(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_split(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_split(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+BOOST_AUTO_TEST_CASE(op_and) {
+	test_and(0);
+	test_and(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_and(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_and(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+BOOST_AUTO_TEST_CASE(op_or) {
+	test_or(0);
+	test_or(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_or(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_or(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+BOOST_AUTO_TEST_CASE(op_xor) {
+	test_xor(0);
+	test_xor(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_xor(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_xor(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+BOOST_AUTO_TEST_CASE(op_div) {
+	test_div(0);
+	test_div(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_div(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_div(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+BOOST_AUTO_TEST_CASE(op_mod) {
+	test_mod(0);
+	test_mod(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_mod(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_mod(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
 BOOST_AUTO_TEST_CASE(op_num2bin) {
 	test_num2bin(0);
 	test_num2bin(STANDARD_SCRIPT_VERIFY_FLAGS);
