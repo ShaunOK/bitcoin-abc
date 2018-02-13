@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE(cat_split) {
 	test_cat_split(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_cat_split(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
-/*
+
 BOOST_AUTO_TEST_CASE(op_and) {
 	test_and(0);
 	test_and(STANDARD_SCRIPT_VERIFY_FLAGS);
