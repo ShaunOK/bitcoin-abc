@@ -1341,53 +1341,66 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         // pop and push to stack
                     } break;
 
-                    case OP_BIN2NUM:
-                    case OP_NUM2BIN:
-                    {
-                        if (opcode == OP_BIN2NUM) {
-                            // (in -- out)
-                            if (stack.size() < 1) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                            }
+                    case OP_BIN2NUM: {
+			// (in -- out)
+			if (stack.size() < 1) {
+			return set_error(
+			    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+			}
 
-                            int64_t num = CScriptNum(stacktop(-1), false).getint();
-                            if (num > INT_MAX || num < INT_MIN) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
-                            }
+			valtype bin=stacktop(-1);
+			std::reverse(bin.begin(),bin.end()); //be2le
+for (auto& i:bin) cout << hex << (int)i << " ";
+cout << endl;
+			CScriptNum num(bin, false);
+			if (num > (INT_MAX>>1) || num < (INT_MIN>>1)) 
+				return set_error(serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
 
+			stack.pop_back();
+			stack.push_back(num.getvch());
+			}
+			break;
+                    case OP_NUM2BIN: {
+			if (stack.size() < 2) return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-                            CScriptNum bn(num);
-                            stack.pop_back();
-                            stack.push_back(bn.getvch());
-                        }
+			CScriptNum bn(stacktop(-2), fRequireMinimal);
+			int64_t sz = CScriptNum(stacktop(-1), fRequireMinimal).getint();
+			if (sz<0 || static_cast<uint64_t>(sz)>MAX_NUM2BIN_SIZE) return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+			valtype v=bn.getvch(); //LE
+			valtype ans;
+			if (sz<v.size()) return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+//cout << "sz=" << sz << " v.size()=" << v.size() << endl;
+			ans.reserve(sz);
+			bool neg=*v.rbegin()&0x80;
+			*v.rbegin()&=~0x80; //make it positive
+			size_t pad=sz-v.size();
+			for (uint8_t i=0; i<pad; ++i) {
+				ans.push_back(0);
+			}
+			for (auto i=v.rbegin(); i!=v.rend(); ++i) {
+				ans.push_back(*i);
+			}
+			if (neg) *ans.begin()|=0x80;
+			stack.pop_back();
+			stack.pop_back();
+			stack.push_back(ans);
 
-                        if (opcode == OP_NUM2BIN) {
-                            // (in size -- out)
-                            if (stack.empty() || stack.size() < 2) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                            }
+/*
+			CScriptNum bn(num);
+			valtype output = bn.getvch();
 
-                            int64_t size = CScriptNum(stacktop(-2), true).getint();
-                            int64_t num = CScriptNum(stacktop(-1), false).getint();
+			if (size > 4 || size <= 0 || size > output.size()) {
+			return set_error(
+			    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+			}
+			output.resize(size);
 
-                            CScriptNum bn(num);
-                            valtype output = bn.getvch();
-
-                            if (size > 4 || size <= 0 || size > output.size()) {
-                                return set_error(
-                                    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-                            }
-                            output.resize(size);
-
-                            stack.pop_back();
-                            stack.pop_back();
-                            stack.push_back(output);
-                        }
-                    } break;
-
+			stack.pop_back();
+			stack.pop_back();
+			stack.push_back(output);
+*/
+			}
+			break;
                     default:
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
                 }
