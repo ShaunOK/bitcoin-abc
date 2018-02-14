@@ -9,199 +9,78 @@
 #include "policy/policy.h"
 #include "core_io.h"
 #include <boost/test/unit_test.hpp>
-#include <iostream>
-#include <iomanip>
+#include <cassert>
 
 using namespace std;
+
+#ifdef VERBOSE
+#undef VERBOSE
+#endif
+
+//--------------------------
+//uncomment the following line to see debug output
+//#define VERBOSE
+//--------------------------
+
+#ifdef VERBOSE
+#include <iostream>
+#include <iomanip>
+#endif
 
 namespace {
 	typedef vector<uint8_t> item;
 	typedef vector<item> stack_t;
 
-	void print(const item& i) {
-		if (i.empty()) cout << "empty";
-		for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
-		cout << endl;
-	}
-	void print(const stack_t& i) {
-		for (auto& s:i) print(s);
-		cout << endl;
-	}
+	#ifdef VERBOSE
+		void print(const item& i) {
+			if (i.empty()) cout << "empty";
+			for (auto& s:i)	cout << hex << setw(2) << setfill('0') << (int) s << " ";
+			cout << endl;
+		}
+		void print(const stack_t& i) {
+			for (auto& s:i) print(s);
+			cout << endl;
+		}
+	#endif
+
 	void test(const CScript& script, stack_t stack, uint32_t flags, const ScriptError se) {
-cout << "--------------" << endl;
-cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
-cout << "with input stack: " << endl;
-print(stack);
-cout << "expected error: " << se << endl;
+		#ifdef VERBOSE
+			cout << "--------------" << endl;
+			cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
+			cout << "with input stack: " << endl;
+			print(stack);
+			cout << "expected error: " << se << endl;
+		#endif
 		ScriptError err=SCRIPT_ERR_OK;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
 		BOOST_CHECK_EQUAL(r, false);
-cout << "got error: " << err << " vs " << se << endl;
+		#ifdef VERBOSE
+			cout << "got error: " << err << " vs " << se << endl;
+		#endif
 		BOOST_CHECK_EQUAL(err==se, true);
 	}
 
 
 	void test(const CScript& script, stack_t stack, uint32_t flags, stack_t expected) {
-cout << "--------------" << endl;
-cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
-cout << "with input stack: " << endl;
-print(stack);
-cout << "expected output stack: " << endl;
-print(expected);
-
+		#ifdef VERBOSE
+			cout << "--------------" << endl;
+			cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
+			cout << "with input stack: " << endl;
+			print(stack);
+			cout << "expected output stack: " << endl;
+			print(expected);
+		#endif
 		ScriptError err;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
-cout << "got output stack: " << endl;
-print(stack);
-
+		#ifdef VERBOSE
+			cout << "got output stack: " << endl;
+			print(stack);
+		#endif
 		BOOST_CHECK_EQUAL(r, true);
 		BOOST_CHECK_EQUAL(err, SCRIPT_ERR_OK);
 		BOOST_CHECK_EQUAL(stack==expected, true);
-cout << "--------------" << endl;
-	}
-
-	vector<uint8_t> make_ev(vector<uint8_t> v, size_t sz) { //v contains a num in LE
-		vector<uint8_t> ans;
-		if (v.empty()) return ans;
-		if (sz<v.size()) {
-			return ans;
-		}
-		ans.reserve(sz);
-		bool neg=*v.rbegin()&0x80;
-		*v.rbegin()&=~0x80;
-		size_t pad=sz-v.size();
-		for (uint8_t i=0; i<pad; ++i) {
-			ans.push_back(0);
-		}
-		for (auto i=v.rbegin(); i!=v.rend(); ++i) {
-			ans.push_back(*i);
-		}
-		if (neg) *ans.begin()|=0x80;
-		return ans;
-	}
-
-	void test_num2bin(const CScript& script, vector<uint8_t> v, uint32_t flags) {
-		if (v.empty()) return;
-		for (uint8_t i=0; i<v.size(); ++i) {
-			if (i==0)
-				test(script,stack_t{v,{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); 
-			else
-				test(script,stack_t{v,{i}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); 
-		}
-		for (uint8_t i=v.size(); i<=MAX_NUM2BIN_SIZE; ++i) {
-			if (i==0)
-				test(script,stack_t{v,{}},flags,stack_t{make_ev(v,i)}); 
-			else
-				test(script,stack_t{v,{i}},flags,stack_t{make_ev(v,i)}); 
-		}
-	}
-
-
-	void test_num2bin(uint32_t flags) {
-		CScript script;
-		script << OP_NUM2BIN;
-		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION); //empty stack
-		test(script,stack_t{{4}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION); //1 item stack
-		test(script,stack_t{{0x02},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size>MAX_NUM2BIN_SIZE
-		test(script,stack_t{{0x85},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size>MAX_NUM2BIN_SIZE
-		test(script,stack_t{{0x02},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, positive, size 0
-		test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size <0
-		test(script,stack_t{{0x85},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); //2 item stack, negative, size 0
-		test_num2bin(script,{},flags);
-		test_num2bin(script,{0x7f},flags);
-
-		test_num2bin(script,{0xff,0x7f},flags); //LE for 0x7FFF
-		test_num2bin(script,{0x02,0x71},flags);
-		test_num2bin(script,{0xff,0xff,0x7f},flags);
-		test_num2bin(script,{0x03,0x02,0x71},flags);
-		test_num2bin(script,{0xff,0xff,0xff,0x7f},flags);
-		test_num2bin(script,{0x04,0x03,0x02,0x71},flags);
-		test_num2bin(script,{0x81},flags);
-		test_num2bin(script,{0xff,0x80},flags);
-		test_num2bin(script,{0xaf,0x81},flags);
-		test_num2bin(script,{0xed,0x60,0x83},flags);
-		test_num2bin(script,{0xb6,0xe3,0x81},flags);
-		test_num2bin(script,{0x81,0x9a,0x6e,0x84},flags);
-		test_num2bin(script,{0xe4,0xc3,0x92,0x91},flags);
-	}
-
-
-	item mk_bin(int64_t v0) {
-		cout << endl << "mk_bin:" << endl;
-		if (v0==0) return item{0x00};
-
-
-		bool neg=v0<0;
-
-		cout << "item:" << hex << v0 << " neg " << neg << endl;
-		uint64_t v=htobe64(neg?-v0:v0); 
-		{
-		uint8_t* p=reinterpret_cast<uint8_t*>(&v);
-		cout << "+ve item BE:" << hex;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p; ++p;
-		cout << ' ' << (int)*p << endl;
-		}
-		item ans;
-		ans.reserve(sizeof(uint64_t));
-
-//		uint8_t* pp=reinterpret_cast<uint8_t*>(&v)+sizeof(int64_t)-1;
-//		while(*pp==0) --pp;
-		
-		uint8_t* p=reinterpret_cast<uint8_t*>(&v);
-		for (size_t i=0; i<sizeof(uint64_t); ++i, ++p) {
-			if (ans.empty()) {
-				if (!*p) continue;
-				if (*p&0x80) ans.push_back(0x00); //first bit looks like a sign but it is not, we add a leading 0
-			}
-			ans.push_back(*p);
-		}
-		if (neg) *ans.begin()|=0x80; //add the sign
-		cout << "ans:" << endl;
-		print(ans);
-
-		return move(ans);
-	}
-
-	void test_bin2num(uint32_t flags) {
-		CScript script;
-		script << OP_BIN2NUM;
-
-		{ item i{0x00, 0x80, 0x00, 0x05}; BOOST_CHECK_EQUAL(mk_bin(0x800005)==i, true); }
-		{ item i{0x05}; BOOST_CHECK_EQUAL(mk_bin(0x000005)==i, true); }
-		{ item i{0x01,0x05}; BOOST_CHECK_EQUAL(mk_bin(0x000105)==i, true); }
-		{ item i{0x81,0x05}; BOOST_CHECK_EQUAL(mk_bin(-0x000105)==i, true); }
-
-		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-		test(script,stack_t{mk_bin(0)},flags,stack_t{{}});
-		test(script,stack_t{mk_bin((int64_t)INT_MAX>>1)},flags,stack_t{CScriptNum(INT_MAX>>1).getvch()});
-		test(script,stack_t{mk_bin((int64_t)INT_MIN>>1)},flags,stack_t{CScriptNum(INT_MIN>>1).getvch()});
-
-/*
-{
-BaseSignatureChecker sigchecker;
-CScript s;
-s << INT_MIN;
-cout << FormatScript(s) << endl;
-stack_t t;
-bool r=EvalScript(t, s, 0, sigchecker, 0);
-print(t);
-exit(0);
-}
-exit(0);
-*/
-
-
-		test(script,stack_t{mk_bin((int64_t)(INT_MAX>>1)+1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
-		test(script,stack_t{mk_bin((int64_t)(INT_MIN>>1)-1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
-
 	}
 
 	void test_cat(uint32_t flags) {
@@ -251,8 +130,6 @@ exit(0);
 		test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00,0x00}});
 		test(script,stack_t{{0x01},{0x02}},flags,stack_t{{0x01,0x02}});
 		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a},{0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14}},flags,stack_t{{0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14}});
-
-
 	}
 
 	void test_split(uint32_t flags) {
@@ -301,8 +178,6 @@ exit(0);
 		item maxlength_item(MAX_SCRIPT_ELEMENT_SIZE, 0x00);
 		test(script,stack_t{maxlength_item,{}},flags,stack_t{{},maxlength_item});
 		}
-
-
 	}
 
 	void test_cat_split(const item& x, uint32_t flags) {
@@ -323,7 +198,6 @@ exit(0);
 	}
 
 	void test_bitwiseop(const CScript& script, uint32_t flags) {
-
 		//number of inputs
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
 		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -342,7 +216,6 @@ exit(0);
 		test(script,stack_t{{0x01,0x01},{0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
 		test(script,stack_t{{0x01,0x01,0x01},{0x01,0x01}},flags,SCRIPT_ERR_INVALID_BITWISE_OPERATION);
 	}
-
 
 	void test_and(uint32_t flags) {
 		CScript script;
@@ -371,9 +244,8 @@ exit(0);
 		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C & 0xDB);
 		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
 		}
-
-		
 	}
+
 	void test_or(uint32_t flags) {
 		CScript script;
 		script << OP_OR;
@@ -432,9 +304,8 @@ exit(0);
 		item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C ^ 0xDB);
 		test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
 		}
-
-
 	}
+
 	void test_div(uint32_t flags) {
 		CScript script;
 		script << OP_DIV;
@@ -502,6 +373,7 @@ exit(0);
 		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0x04}},flags,stack_t{{0x70,0x38,0xb9}});
 		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0x84}},flags,stack_t{{0x70,0x38,0x39}});
 	}
+
 	void test_mod(uint32_t flags) {
 		CScript script;
 		script << OP_MOD;
@@ -532,15 +404,169 @@ exit(0);
 		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x01}},flags,stack_t{{0x94,0x80}});
 		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x03}},flags,stack_t{{0x81}});
 		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0xbb,0xf0,0x5d,0x83}});
-
-
-
-
 	}
 
+	vector<uint8_t> make_ev(vector<uint8_t> v, size_t sz) { //v contains a num in LE
+		if (v.empty()) return vector<uint8_t>(sz,0);
+		vector<uint8_t> ans;
+		assert(sz>=v.size());
+		ans.reserve(sz);
+		bool neg=*v.rbegin()&0x80;
+		*v.rbegin()&=~0x80;
+		size_t pad=sz-v.size();
+		for (uint8_t i=0; i<pad; ++i) {
+			ans.push_back(0);
+		}
+		for (auto i=v.rbegin(); i!=v.rend(); ++i) {
+			ans.push_back(*i);
+		}
+		if (neg) *ans.begin()|=0x80;
+		return ans;
+	}
+
+	void test_num2bin(const CScript& script, vector<uint8_t> v, uint32_t flags) {
+		if (v.empty()) return;
+		for (uint8_t i=0; i<v.size(); ++i) {
+			if (i==0)
+				test(script,stack_t{v,{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); 
+			else
+				test(script,stack_t{v,{i}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); 
+		}
+		for (uint8_t i=v.size(); i<=MAX_NUM2BIN_SIZE; ++i) {
+			if (i==0)
+				test(script,stack_t{v,{}},flags,stack_t{make_ev(v,i)}); 
+			else
+				test(script,stack_t{v,{i}},flags,stack_t{make_ev(v,i)}); 
+		}
+	}
+
+	void test_num2bin(uint32_t flags) {
+		CScript script;
+		script << OP_NUM2BIN;
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{4}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{{0x02},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		test(script,stack_t{{0x85},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		test(script,stack_t{{0x02},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		test(script,stack_t{{0x85},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+		test_num2bin(script,{},flags);
+		test_num2bin(script,{0x7f},flags);
+		test_num2bin(script,{0xff,0x7f},flags); //LE for 0x7FFF
+		test_num2bin(script,{0x02,0x71},flags);
+		test_num2bin(script,{0xff,0xff,0x7f},flags);
+		test_num2bin(script,{0x03,0x02,0x71},flags);
+		test_num2bin(script,{0xff,0xff,0xff,0x7f},flags);
+		test_num2bin(script,{0x04,0x03,0x02,0x71},flags);
+		test_num2bin(script,{0x81},flags);
+		test_num2bin(script,{0xff,0x80},flags);
+		test_num2bin(script,{0xaf,0x81},flags);
+		test_num2bin(script,{0xed,0x60,0x83},flags);
+		test_num2bin(script,{0xb6,0xe3,0x81},flags);
+		test_num2bin(script,{0x81,0x9a,0x6e,0x84},flags);
+		test_num2bin(script,{0xe4,0xc3,0x92,0x91},flags);
+	}
+
+	item mk_bin(int64_t v0) {
+		if (v0==0) return item{0x00};
+		bool neg=v0<0;
+		uint64_t v=htobe64(neg?-v0:v0); 
+		item ans;
+		ans.reserve(sizeof(uint64_t));
+		uint8_t* p=reinterpret_cast<uint8_t*>(&v);
+		for (size_t i=0; i<sizeof(uint64_t); ++i, ++p) {
+			if (ans.empty()) {
+				if (!*p) continue;
+				if (*p&0x80) ans.push_back(0x00); //first bit looks like a sign but it is not, we add a leading 0
+			}
+			ans.push_back(*p);
+		}
+		if (neg) *ans.begin()|=0x80; //add the sign
+		return move(ans);
+	}
+
+	void test_bin2num(uint32_t flags) {
+		CScript script;
+		script << OP_BIN2NUM;
+		{ item i{0x00, 0x80, 0x00, 0x05}; BOOST_CHECK_EQUAL(mk_bin(0x800005)==i, true); }
+		{ item i{0x05}; BOOST_CHECK_EQUAL(mk_bin(0x000005)==i, true); }
+		{ item i{0x01,0x05}; BOOST_CHECK_EQUAL(mk_bin(0x000105)==i, true); }
+		{ item i{0x81,0x05}; BOOST_CHECK_EQUAL(mk_bin(-0x000105)==i, true); }
+		test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
+		test(script,stack_t{mk_bin(0)},flags,stack_t{{}});
+		test(script,stack_t{mk_bin((int64_t)INT_MAX>>1)},flags,stack_t{CScriptNum(INT_MAX>>1).getvch()});
+		test(script,stack_t{mk_bin((int64_t)INT_MIN>>1)},flags,stack_t{CScriptNum(INT_MIN>>1).getvch()});
+		test(script,stack_t{mk_bin((int64_t)(INT_MAX>>1)+1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
+		test(script,stack_t{mk_bin((int64_t)(INT_MIN>>1)-1)},flags,SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
+		test(script,stack_t{mk_bin(106894)},flags,stack_t{CScriptNum(106894).getvch()});
+		test(script,stack_t{mk_bin(-106894)},flags,stack_t{CScriptNum(-106894).getvch()});
+		test(script,stack_t{mk_bin(0)},flags,stack_t{CScriptNum(0).getvch()});
+	}
+
+	void test_bin2num_num2bin(const CScript& script, int sz, int64_t v, uint32_t flags) {
+		auto x=mk_bin(v);
+		test(script,stack_t{x},flags,stack_t{make_ev(CScriptNum(v).getvch(),sz)});
+	}
+
+	void test_num2bin_bin2num(const CScript& script, int64_t v, uint32_t flags) {
+		test(script,stack_t{CScriptNum(v).getvch()},flags,stack_t{CScriptNum(v).getvch()});
+	}
+
+	void test_bin2num_num2bin(int sz, uint32_t flags) {
+		CScript script;
+		script << OP_BIN2NUM << sz << OP_NUM2BIN;
+		test_bin2num_num2bin(script,sz,0,flags);
+		test_bin2num_num2bin(script,sz,1,flags);
+		test_bin2num_num2bin(script,sz,-1,flags);
+		if (sz>=2) {
+			test_bin2num_num2bin(script,sz,321,flags);
+			test_bin2num_num2bin(script,sz,-321,flags);
+			if (sz>=3) {
+				test_bin2num_num2bin(script,sz,106894,flags);
+				test_bin2num_num2bin(script,sz,-106894,flags);
+				if (sz>=4) {
+					test_bin2num_num2bin(script,sz,INT_MAX>>1,flags);
+					test_bin2num_num2bin(script,sz,INT_MIN>>1,flags);
+				}
+			}
+		}
+	}
+
+	void test_num2bin_bin2num(int sz, uint32_t flags) {
+		CScript script;
+		script << sz << OP_NUM2BIN << OP_BIN2NUM;
+		test_num2bin_bin2num(script,0,flags);
+		test_num2bin_bin2num(script,1,flags);
+		test_num2bin_bin2num(script,-1,flags);
+		if (sz>=2) {
+			test_num2bin_bin2num(script,321,flags);
+			test_num2bin_bin2num(script,-321,flags);
+			if (sz>=3) {
+				test_num2bin_bin2num(script,106894,flags);
+				test_num2bin_bin2num(script,-106894,flags);
+				if (sz>=4) {
+					test_num2bin_bin2num(script,INT_MAX>>1,flags);
+					test_num2bin_bin2num(script,INT_MIN>>1,flags);
+				}
+			}
+		}
+	}
+
+	void test_bin2num_num2bin(uint32_t flags) {
+		test_bin2num_num2bin(4,flags); //expect 4 byte output
+		test_bin2num_num2bin(3,flags); //expect 3 byte output
+		test_bin2num_num2bin(2,flags); //expect 2 byte output
+		test_bin2num_num2bin(1,flags); //expect 1 byte output
+	}
+
+	void test_num2bin_bin2num(uint32_t flags) {
+		test_num2bin_bin2num(4,flags); //4 byte num2bin output
+		test_num2bin_bin2num(3,flags); //3 byte num2bin output
+		test_num2bin_bin2num(2,flags); //2 byte num2bin output
+		test_num2bin_bin2num(1,flags); //1 byte num2bin output
+	}
 }
 
-//BOOST_FIXTURE_TEST_SUITE(op_code, op_code_test)
 BOOST_AUTO_TEST_SUITE(op_code)
 
 BOOST_AUTO_TEST_CASE(op_cat) {
@@ -609,7 +635,6 @@ BOOST_AUTO_TEST_CASE(op_num2bin) {
 
 }
 
-
 BOOST_AUTO_TEST_CASE(op_bin2num) {
 	test_bin2num(0);
 	test_bin2num(STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -617,7 +642,19 @@ BOOST_AUTO_TEST_CASE(op_bin2num) {
 	test_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
 
+BOOST_AUTO_TEST_CASE(bin2num_num2bin) {
+	test_bin2num_num2bin(0);
+	test_bin2num_num2bin(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_bin2num_num2bin(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_bin2num_num2bin(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+
+BOOST_AUTO_TEST_CASE(num2bin_bin2num) {
+	test_num2bin_bin2num(0);
+	test_num2bin_bin2num(STANDARD_SCRIPT_VERIFY_FLAGS);
+	test_num2bin_bin2num(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+	test_num2bin_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
-
-
 

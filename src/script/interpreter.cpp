@@ -17,11 +17,6 @@
 
 typedef std::vector<uint8_t> valtype;
 
-//----------------- delete
-#include <iostream>  
-using namespace std;
-
-
 namespace {
 
 inline bool set_success(ScriptError *ret) {
@@ -973,7 +968,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                         serror, SCRIPT_ERR_MOD_BY_ZERO);
                                 }
                                 bn = bn1 % bn2;
-//cout << dec << bn1.getint() << " " << bn2.getint() << " " << bn.getint() << endl;
                                 break;
 
                             case OP_BOOLAND:
@@ -1272,10 +1266,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                     } break;
 
-
-                    //
-                    // Crypto
-                    //
                     case OP_CAT:
                     {
                         // (x1 x2 -- out)
@@ -1327,18 +1317,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 		                stack.emplace_back(move(vchOut1));
 		                stack.emplace_back(move(vchOut2));
 			}
-			
-
-                        // only execute if nPosition > 0
-/*
-                        if (nPosition != 0) {
-                            // insert range from vch into vchOut1 starting from left
-                            vchOut1.insert(vchOut1.begin(), vch.begin(), vch.begin() + nPosition - 1);
-                            // vchOut2 erases characters starting from left
-                            vchOut2.erase(vch.begin(), vch.begin() + nPosition);
-                        }
-*/
-                        // pop and push to stack
                     } break;
 
                     case OP_BIN2NUM: {
@@ -1350,8 +1328,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
 			valtype bin=stacktop(-1);
 			std::reverse(bin.begin(),bin.end()); //be2le
-for (auto& i:bin) cout << hex << (int)i << " ";
-cout << endl;
 			CScriptNum num(bin, false);
 			if (num > (INT_MAX>>1) || num < (INT_MIN>>1)) 
 				return set_error(serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
@@ -1365,14 +1341,18 @@ cout << endl;
 
 			CScriptNum bn(stacktop(-2), fRequireMinimal);
 			int64_t sz = CScriptNum(stacktop(-1), fRequireMinimal).getint();
-			if (sz<0 || static_cast<uint64_t>(sz)>MAX_NUM2BIN_SIZE) return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+			if (sz<1 || static_cast<uint64_t>(sz) > MAX_NUM2BIN_SIZE) 
+				return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
 			valtype v=bn.getvch(); //LE
 			valtype ans;
-			if (sz<v.size()) return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-//cout << "sz=" << sz << " v.size()=" << v.size() << endl;
+			if (static_cast<uint64_t>(sz) < v.size()) 
+				return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
 			ans.reserve(sz);
-			bool neg=*v.rbegin()&0x80;
-			*v.rbegin()&=~0x80; //make it positive
+			bool neg{false};
+			if (!v.empty()) {
+				neg=*v.rbegin()&0x80;
+				*v.rbegin()&=~0x80; //make it positive
+			}
 			size_t pad=sz-v.size();
 			for (uint8_t i=0; i<pad; ++i) {
 				ans.push_back(0);
@@ -1384,21 +1364,6 @@ cout << endl;
 			stack.pop_back();
 			stack.pop_back();
 			stack.push_back(ans);
-
-/*
-			CScriptNum bn(num);
-			valtype output = bn.getvch();
-
-			if (size > 4 || size <= 0 || size > output.size()) {
-			return set_error(
-			    serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-			}
-			output.resize(size);
-
-			stack.pop_back();
-			stack.pop_back();
-			stack.push_back(output);
-*/
 			}
 			break;
                     default:
