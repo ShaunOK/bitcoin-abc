@@ -35,9 +35,6 @@ static const int MAX_SCRIPT_SIZE = 10000;
 // otherwise as UNIX timestamp. Thresold is Tue Nov 5 00:53:20 1985 UTC
 static const unsigned int LOCKTIME_THRESHOLD = 500000000;
 
-// Maximum byte size of integers in OP_NUM2BIN
-static const int MAX_NUM2BIN_SIZE = 4;
-
 template <typename T> std::vector<uint8_t> ToByteVector(const T &in) {
     return std::vector<uint8_t>(in.begin(), in.end());
 }
