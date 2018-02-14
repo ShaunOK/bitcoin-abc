@@ -121,18 +121,12 @@ const char *GetOpName(opcodetype opcode) {
         // splice ops
         case OP_CAT:
             return "OP_CAT";
-        case OP_SUBSTR:
-            return "OP_SUBSTR";
-        case OP_LEFT:
-            return "OP_LEFT";
-        case OP_RIGHT:
-            return "OP_RIGHT";
+        case OP_SPLIT:
+            return "OP_SPLIT";
         case OP_SIZE:
             return "OP_SIZE";
 
         // bit logic
-        case OP_INVERT:
-            return "OP_INVERT";
         case OP_AND:
             return "OP_AND";
         case OP_OR:
@@ -227,6 +221,10 @@ const char *GetOpName(opcodetype opcode) {
             return "OP_CHECKMULTISIGVERIFY";
 
         // expansion
+        case OP_BIN2NUM:
+            return "OP_BIN2NUM";
+        case OP_NUM2BIN:
+            return "OP_NUM2BIN";
         case OP_NOP1:
             return "OP_NOP1";
         case OP_CHECKLOCKTIMEVERIFY:
