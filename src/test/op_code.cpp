@@ -170,6 +170,38 @@ namespace {
 
     }
 
+    /// OP_XOR tests
+
+    void test_xor(uint32_t flags) {
+        CScript script;
+        script << OP_XOR;
+        test_bitwiseop(script,flags);
+
+        test(script,stack_t{{0x00},{0x00}},flags,stack_t{{0x00}});
+        test(script,stack_t{{0x00},{0x01}},flags,stack_t{{0x01}});
+        test(script,stack_t{{0x01},{0x00}},flags,stack_t{{0x01}});
+        test(script,stack_t{{0x01},{0x01}},flags,stack_t{{0x00}});
+
+        test(script,stack_t{{0x00,0x00},{0x00,0x00}},flags,stack_t{{0x00,0x00}});
+        test(script,stack_t{{0x00,0x00},{0x01,0x00}},flags,stack_t{{0x01,0x00}});
+        test(script,stack_t{{0x01,0x00},{0x00,0x00}},flags,stack_t{{0x01,0x00}});
+        test(script,stack_t{{0x01,0x00},{0x01,0x00}},flags,stack_t{{0x00,0x00}});
+
+        {
+        item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x01);
+        item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xF0);
+        item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x01 ^ 0xF0);
+        test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+        }
+
+        {
+        item maxlenbin1(MAX_SCRIPT_ELEMENT_SIZE,0x3C);
+        item maxlenbin2(MAX_SCRIPT_ELEMENT_SIZE,0xDB);
+        item maxlenbin3(MAX_SCRIPT_ELEMENT_SIZE,0x3C ^ 0xDB);
+        test(script,stack_t{maxlenbin1,maxlenbin2},flags,stack_t{maxlenbin3});
+        }
+    }
+
 }
 
 /// Entry points
@@ -188,6 +220,13 @@ BOOST_AUTO_TEST_CASE(op_or) {
     test_or(STANDARD_SCRIPT_VERIFY_FLAGS);
     test_or(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
     test_or(STANDARD_LOCKTIME_VERIFY_FLAGS);
+}
+
+BOOST_AUTO_TEST_CASE(op_xor) {
+    test_xor(0);
+    test_xor(STANDARD_SCRIPT_VERIFY_FLAGS);
+    test_xor(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+    test_xor(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
