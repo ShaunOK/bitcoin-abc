@@ -776,8 +776,46 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     //
                     // Bitwise logic
                     //
-                    case OP_AND:
-                    case OP_OR:
+                    case OP_AND: {
+                        // (x1 x2 - out)
+                        if (stack.size() < 2) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype& vch1 = stacktop(-2);
+                        valtype& vch2 = stacktop(-1);
+                        // throw error if inputs are not the same size
+                        if (vch1.size() != vch2.size()) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+                        }
+                        for (size_t i = 0; i < vch1.size(); i++) {
+                            vch1[i] &= vch2[i];
+                        }
+                        stack.pop_back();
+                    } break;
+
+                    case OP_OR: {
+                        // (x1 x2 - out)
+                        if (stack.size() < 2) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+
+                        valtype& vch1 = stacktop(-2);
+                        valtype& vch2 = stacktop(-1);
+
+                        // throw error if inputs are not the same size
+                        if (vch1.size() != vch2.size()) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_BITWISE_OPERATION);
+                        }
+                        for (size_t i = 0; i < vch1.size(); i++) {
+                            vch1[i] |= vch2[i];
+                        }
+                        stack.pop_back();
+                    } break;
+
                     case OP_XOR: {
                         // (x1 x2 - out)
                         if (stack.size() < 2) {
@@ -794,21 +832,11 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_BITWISE_OPERATION);
                         }
 
-                        if (opcode == OP_AND) {
-                            for (size_t i = 0; i < vch1.size(); i++)
-                                vch1[i] &= vch2[i];
-                        }
-                        else if (opcode == OP_OR) {
-                            for (size_t i = 0; i < vch1.size(); i++)
-                                vch1[i] |= vch2[i];
-                        }
-                        else if (opcode == OP_XOR) {
-                            for (size_t i = 0; i < vch1.size(); i++)
-                                vch1[i] ^= vch2[i];
+                        for (size_t i = 0; i < vch1.size(); i++) {
+                            vch1[i] ^= vch2[i];
                         }
                         stack.pop_back();
-                    }
-                    break;
+                    } break;
 
                     case OP_EQUAL:
                     case OP_EQUALVERIFY:
@@ -920,7 +948,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 break;
 
                             case OP_DIV:
-                                // bn2 must not be 0
+                                // 2nd operand must not be 0
                                 if (bn2 == 0) {
                                     return set_error(
                                         serror, SCRIPT_ERR_DIV_BY_ZERO);
@@ -928,8 +956,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 bn = bn1 / bn2;
                                 break;
                             case OP_MOD:
-                                // 2nd operand must be positive
-                                if (bn2 <= 0) {
+                                // 2nd operand must not be 0
+                                if (bn2 == 0) {
                                     return set_error(
                                         serror, SCRIPT_ERR_MOD_BY_ZERO);
                                 }
@@ -1288,7 +1316,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         valtype bin=stacktop(-1);
                         std::reverse(bin.begin(),bin.end()); //be2le
                         CScriptNum num(bin, false);
-                        if (num > (INT_MAX>>1) || num < (INT_MIN>>1)) 
+                        if (num > (INT_MAX>>1) || num < (INT_MIN>>1))
                             return set_error(serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
                         stack.pop_back();
                         stack.push_back(num.getvch());
@@ -1298,10 +1326,10 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         if (stack.size() < 2) return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         CScriptNum bn(stacktop(-2), fRequireMinimal);
                         int64_t sz = CScriptNum(stacktop(-1), fRequireMinimal).getint();
-                        if (sz<1 || static_cast<uint64_t>(sz) > MAX_NUM2BIN_SIZE) 
+                        if (sz<1 || static_cast<uint64_t>(sz) > CScriptNum::nDefaultMaxNumSize)
                             return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                         valtype v=bn.getvch(); //LE
-                        if (static_cast<uint64_t>(sz) < v.size()) 
+                        if (static_cast<uint64_t>(sz) < v.size())
                             return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
                         valtype ans;
                         ans.reserve(sz);

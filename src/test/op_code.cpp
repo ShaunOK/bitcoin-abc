@@ -385,10 +385,8 @@ namespace {
         test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
         test(script,stack_t{{0x01,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
 
-        //mod by <0
+        //mod by 0
         test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_MOD_BY_ZERO);
-        test(script,stack_t{{0x01,0x05},{0x81}},flags,SCRIPT_ERR_MOD_BY_ZERO);
-        test(script,stack_t{{0x01,0x05},{0xad,0x81}},flags,SCRIPT_ERR_MOD_BY_ZERO);
 
         //56488123%321 =148
         //56488123%3 =1
