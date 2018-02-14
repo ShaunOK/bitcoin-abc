@@ -103,7 +103,6 @@ namespace {
         input_stack.push_back(i);
         test(script,input_stack,flags,SCRIPT_ERR_PUSH_SIZE);
         }
-
     
         //Concatenation of a max-sized item with empty is legal
         {

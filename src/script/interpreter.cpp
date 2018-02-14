@@ -1266,8 +1266,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                     } break;
 
-                    case OP_CAT:
-                    {
+                    case OP_CAT: {
                         // (x1 x2 -- out)
                         if (stack.size() < 2) {
                             return set_error(
@@ -1282,8 +1281,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         stack.pop_back();
                     } break;
 
-                    case OP_SPLIT:
-                    {
+                    case OP_SPLIT: {
                         // (in position -- x1 x2)
                         if (stack.size() < 2) {
                             return set_error(
@@ -1302,70 +1300,64 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         stack.pop_back();
 
                         // initialize outputs
-            if (nPosition == 0) {
-                        stack.push_back(valtype());
-                        stack.push_back(vch);
-            }
-            else if (static_cast<size_t>(nPosition) == vch.size()) {
-                        stack.push_back(vch);
-                        stack.push_back(valtype());
-            }
-            else {
-                        valtype vchOut1, vchOut2;
-                vchOut1.insert(vchOut1.end(), vch.begin(), vch.begin() + nPosition);
-                vchOut2.insert(vchOut2.end(), vch.begin() + nPosition, vch.end());
-                        stack.emplace_back(move(vchOut1));
-                        stack.emplace_back(move(vchOut2));
-            }
+                        if (nPosition == 0) {
+                            stack.push_back(valtype());
+                            stack.push_back(vch);
+                        }
+                        else if (static_cast<size_t>(nPosition) == vch.size()) {
+                            stack.push_back(vch);
+                            stack.push_back(valtype());
+                        }
+                        else {
+                            valtype vchOut1, vchOut2;
+                            vchOut1.insert(vchOut1.end(), vch.begin(), vch.begin() + nPosition);
+                            vchOut2.insert(vchOut2.end(), vch.begin() + nPosition, vch.end());
+                            stack.emplace_back(move(vchOut1));
+                            stack.emplace_back(move(vchOut2));
+                        }
                     } break;
 
                     case OP_BIN2NUM: {
-            // (in -- out)
-            if (stack.size() < 1) {
-            return set_error(
-                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-            }
+                        // (in -- out)
+                        if (stack.size() < 1) {
+                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype bin=stacktop(-1);
+                        std::reverse(bin.begin(),bin.end()); //be2le
+                        CScriptNum num(bin, false);
+                        if (num > (INT_MAX>>1) || num < (INT_MIN>>1)) 
+                            return set_error(serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
+                        stack.pop_back();
+                        stack.push_back(num.getvch());
+                    } break;
 
-            valtype bin=stacktop(-1);
-            std::reverse(bin.begin(),bin.end()); //be2le
-            CScriptNum num(bin, false);
-            if (num > (INT_MAX>>1) || num < (INT_MIN>>1)) 
-                return set_error(serror, SCRIPT_ERR_INVALID_BIN2NUM_OPERATION);
-
-            stack.pop_back();
-            stack.push_back(num.getvch());
-            }
-            break;
                     case OP_NUM2BIN: {
-            if (stack.size() < 2) return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        if (stack.size() < 2) return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        CScriptNum bn(stacktop(-2), fRequireMinimal);
+                        int64_t sz = CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                        if (sz<1 || static_cast<uint64_t>(sz) > MAX_NUM2BIN_SIZE) 
+                            return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+                        valtype v=bn.getvch(); //LE
+                        if (static_cast<uint64_t>(sz) < v.size()) 
+                            return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+                        valtype ans;
+                        ans.reserve(sz);
+                        bool neg{false};
+                        if (!v.empty()) {
+                            neg=*v.rbegin()&0x80;
+                            *v.rbegin()&=~0x80; //make it positive
+                        }
+                        size_t pad=sz-v.size();
+                        for (uint8_t i=0; i<pad; ++i) {
+                            ans.push_back(0);
+                        }
+                        for (auto i=v.rbegin(); i!=v.rend(); ++i) ans.push_back(*i);
+                        if (neg) *ans.begin()|=0x80;
+                        stack.pop_back();
+                        stack.pop_back();
+                        stack.push_back(ans);
+                    } break;
 
-            CScriptNum bn(stacktop(-2), fRequireMinimal);
-            int64_t sz = CScriptNum(stacktop(-1), fRequireMinimal).getint();
-            if (sz<1 || static_cast<uint64_t>(sz) > MAX_NUM2BIN_SIZE) 
-                return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-            valtype v=bn.getvch(); //LE
-            valtype ans;
-            if (static_cast<uint64_t>(sz) < v.size()) 
-                return set_error(serror, SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-            ans.reserve(sz);
-            bool neg{false};
-            if (!v.empty()) {
-                neg=*v.rbegin()&0x80;
-                *v.rbegin()&=~0x80; //make it positive
-            }
-            size_t pad=sz-v.size();
-            for (uint8_t i=0; i<pad; ++i) {
-                ans.push_back(0);
-            }
-            for (auto i=v.rbegin(); i!=v.rend(); ++i) {
-                ans.push_back(*i);
-            }
-            if (neg) *ans.begin()|=0x80;
-            stack.pop_back();
-            stack.pop_back();
-            stack.push_back(ans);
-            }
-            break;
                     default:
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
                 }
