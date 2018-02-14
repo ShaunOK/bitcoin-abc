@@ -5,8 +5,6 @@
 
 #include "interpreter.h"
 
-//#include <arpa/inet.h>
-//#include <limits.h>
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
