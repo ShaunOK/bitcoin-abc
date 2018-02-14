@@ -777,19 +777,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     //
                     // Bitwise logic
                     //
-                    case OP_INVERT:
-                    {
-                        // (in - out)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-                        valtype& vch = stacktop(-1);
-                        for (size_t i = 0; i < vch.size(); i++)
-                            vch[i] = ~vch[i];
-                    }
-                    break;
-
                     case OP_AND:
                     case OP_OR:
                     case OP_XOR:

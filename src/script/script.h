@@ -112,7 +112,6 @@ enum opcodetype {
     OP_SIZE = 0x82,
 
     // bit logic
-    OP_INVERT = 0x83,
     OP_AND = 0x84,
     OP_OR = 0x85,
     OP_XOR = 0x86,
