@@ -58,8 +58,6 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "Invalid OP_SPLIT range";
         case SCRIPT_ERR_INVALID_BITWISE_OPERATION:
             return "Invalid bitwise operation (check length of inputs)";
-        case SCRIPT_ERR_INVALID_INIT:
-            return "Invalid OP_INIT construction";
         case SCRIPT_ERR_NEGATIVE_LOCKTIME:
             return "Negative locktime";
         case SCRIPT_ERR_UNSATISFIED_LOCKTIME:

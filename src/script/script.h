@@ -168,7 +168,7 @@ enum opcodetype {
     // expansion
     OP_BIN2NUM = 0x80,
     OP_NUM2BIN = 0x81,
-    OP_INIT = 0xb0,
+    OP_NOP1 = 0xb0,
     OP_CHECKLOCKTIMEVERIFY = 0xb1,
     OP_NOP2 = OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY = 0xb2,

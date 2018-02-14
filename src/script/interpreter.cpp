@@ -484,6 +484,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         break;
                     }
 
+                    case OP_NOP1:
                     case OP_NOP4:
                     case OP_NOP5:
                     case OP_NOP6:
@@ -761,24 +762,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                         valtype vch = stacktop(-1);
                         stack.insert(stack.end() - 2, vch);
-                    } break;
-
-                    case OP_INIT: {
-                        // (push n empty bytes onto the stack)
-                        if (stack.size() < 1) {
-                            return set_error(
-                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-                        int64_t n = CScriptNum(stacktop(-1), fRequireMinimal).getint();
-                        if (n < 0) {
-                            return set_error(serror, SCRIPT_ERR_INVALID_INIT);
-                        }
-                        if (n > MAX_SCRIPT_ELEMENT_SIZE) {
-                            return set_error(
-                                serror, SCRIPT_ERR_PUSH_SIZE);
-                        }
-                        std::vector<unsigned char> vch (n, 0);
-                        stack.push_back(vch);
                     } break;
 
                     case OP_SIZE: {
