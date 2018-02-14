@@ -429,7 +429,7 @@ namespace {
             else
                 test(script,stack_t{v,{i}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION); 
         }
-        for (uint8_t i=v.size(); i<=MAX_NUM2BIN_SIZE; ++i) {
+        for (uint8_t i=v.size(); i<=CScriptNum::nDefaultMaxNumSize; ++i) {
             if (i==0)
                 test(script,stack_t{v,{}},flags,stack_t{make_ev(v,i)}); 
             else
@@ -442,8 +442,8 @@ namespace {
         script << OP_NUM2BIN;
         test(script,stack_t(),flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
         test(script,stack_t{{4}},flags,SCRIPT_ERR_INVALID_STACK_OPERATION);
-        test(script,stack_t{{0x02},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
-        test(script,stack_t{{0x85},{MAX_NUM2BIN_SIZE+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+        test(script,stack_t{{0x02},{CScriptNum::nDefaultMaxNumSize+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
+        test(script,stack_t{{0x85},{CScriptNum::nDefaultMaxNumSize+1}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
         test(script,stack_t{{0x02},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
         test(script,stack_t{{0x85},{0x85}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
         test(script,stack_t{{0x85},{}},flags,SCRIPT_ERR_INVALID_NUM2BIN_OPERATION);
