@@ -27,19 +27,21 @@ namespace {
 		for (auto& s:i) print(s);
 		cout << endl;
 	}
-	void test(const CScript& script, stack_t stack, uint32_t flags, ScriptError e) {
+	void test(const CScript& script, stack_t stack, uint32_t flags, const ScriptError se) {
 cout << "--------------" << endl;
 cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
 cout << "with input stack: " << endl;
 print(stack);
-cout << "expected error: " << e << endl;
-		ScriptError err;
+cout << "expected error: " << se << endl;
+		ScriptError err=SCRIPT_ERR_OK;
 		BaseSignatureChecker sigchecker;
 		bool r=EvalScript(stack, script, flags, sigchecker, &err);
 		BOOST_CHECK_EQUAL(r, false);
-cout << "got error: " << err << endl;
-		BOOST_CHECK_EQUAL(err, e);
+cout << "got error: " << err << " vs " << se << endl;
+		BOOST_CHECK_EQUAL(err==se, true);
 	}
+
+
 	void test(const CScript& script, stack_t stack, uint32_t flags, stack_t expected) {
 cout << "--------------" << endl;
 cout << "Checking script \"" << FormatScript(script) << "\" flags " << flags << endl;
@@ -424,13 +426,18 @@ cout << "neg: " << neg << endl;
 		//b == 0 ; b is equal to any type of zero
 		test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
 		test(script,stack_t{{},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
-		test(script,stack_t{{},{0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO);
-		test(script,stack_t{{},{0x00,0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO);
-		
-		//185377af/85f41b01 =0
+		if (flags&SCRIPT_VERIFY_MINIMALDATA) {
+			test(script,stack_t{{},{0x00}},flags,SCRIPT_ERR_UNKNOWN_ERROR); //not minimal encoding
+			test(script,stack_t{{},{0x00,0x00}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
+		}
+		else {
+			test(script,stack_t{{},{0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO); 
+			test(script,stack_t{{},{0x00,0x00}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		}		
+		//185377af/85f41b01 =-4
 		//185377af/00001b01 =E69D
-		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b,0xf4,0x85}},flags,stack_t{{}});
-		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b}},flags,stack_t{{0x9D,0xE6}});
+		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b,0xf4,0x85}},flags,stack_t{{0x84}});
+		test(script,stack_t{{0xaf,0x77,0x53,0x18},{0x01,0x1b}},flags,stack_t{{0x9D,0xE6,0x00}});
 		//15/4 =3
 		//15/-4 =-3
 		//-15/4 =-3
@@ -459,17 +466,17 @@ cout << "neg: " << neg << endl;
 		//15000000/-4000 =-3750
 		//-15000000/4000 =-3750
 		//-15000000/-4000 =3750
-		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x0f}},flags,stack_t{{0x03}});
-		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x8f}},flags,stack_t{{0x83}});
-		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x0f}},flags,stack_t{{0x83}});
-		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0xa0,0x8f}},flags,stack_t{{0x03}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x0f}},flags,stack_t{{0xa6,0x0e}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0xa0,0x8f}},flags,stack_t{{0xa6,0x8e}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0xa0,0x0f}},flags,stack_t{{0xa6,0x8e}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0xa0,0x8f}},flags,stack_t{{0xa6,0x0e}});
 		//15000000/4 =3750000
 		//15000000/-4 =-3750000
 		//-15000000/4 =-3750000
 		//-15000000/-4 =3750000
 		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x04}},flags,stack_t{{0x70,0x38,0x39}});
 		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x84}},flags,stack_t{{0x70,0x38,0xb9}});
-		test(script,stack_t{{0xc0,0xe1,0xe4,0x00},{0x04}},flags,stack_t{{0x70,0x38,0xb9}});
+		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0x04}},flags,stack_t{{0x70,0x38,0xb9}});
 		test(script,stack_t{{0xc0,0xe1,0xe4,0x80},{0x84}},flags,stack_t{{0x70,0x38,0x39}});
 	}
 	void test_mod(uint32_t flags) {
@@ -484,8 +491,10 @@ cout << "neg: " << neg << endl;
 		test(script,stack_t{{0x01,0x02,0x03,0x04,0x05},{0x01}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
 		test(script,stack_t{{0x01,0x05},{0x01,0x02,0x03,0x04,0x05}},flags,SCRIPT_ERR_UNKNOWN_ERROR);
 
-		//div by 0
-		test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_DIV_BY_ZERO);
+		//mod by <0
+		test(script,stack_t{{0x01,0x05},{}},flags,SCRIPT_ERR_MOD_BY_ZERO);
+		test(script,stack_t{{0x01,0x05},{0x81}},flags,SCRIPT_ERR_MOD_BY_ZERO);
+		test(script,stack_t{{0x01,0x05},{0xad,0x81}},flags,SCRIPT_ERR_MOD_BY_ZERO);
 
 		//56488123%321 =148
 		//56488123%3 =1
@@ -494,26 +503,12 @@ cout << "neg: " << neg << endl;
 		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x03}},flags,stack_t{{0x01}});
 		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0xbb,0xf0,0x5d,0x03}});
 
-		//56488123%-321 =-173
-		//56488123%-3 =-2
-		//56488123%-564881230 =-508393107
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x41,0x81}},flags,stack_t{{0xad,0x80}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x83}},flags,stack_t{{0x82}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x03},{0x4e,0x67,0xab,0xa1}},flags,stack_t{{0x93,0x76,0x4d,0x9e}});
-
-		//-56488123%-321 =-148
-		//-56488123%-3 =-1
-		//-56488123%-564881230 =-56488123
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x81}},flags,stack_t{{0x94,0x80}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x83}},flags,stack_t{{0x81}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0xa1}},flags,stack_t{{0xbb,0xf0,0x5d,0x83}});
-
-		//-56488123%321 = 173
-		//-56488123%3 = 2
-		//-56488123%564881230 = 508393107
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x01}},flags,stack_t{{0xad,0x00}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x03}},flags,stack_t{{0x02}});
-		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0x93,0x76,0x4d,0x1e}});
+		//-56488123%321 = -148
+		//-56488123%3 = -1
+		//-56488123%564881230 = -56488123
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x41,0x01}},flags,stack_t{{0x94,0x80}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x03}},flags,stack_t{{0x81}});
+		test(script,stack_t{{0xbb,0xf0,0x5d,0x83},{0x4e,0x67,0xab,0x21}},flags,stack_t{{0xbb,0xf0,0x5d,0x83}});
 
 /*
 BaseSignatureChecker sigchecker;
@@ -532,7 +527,7 @@ exit(0);
 
 //BOOST_FIXTURE_TEST_SUITE(op_code, op_code_test)
 BOOST_AUTO_TEST_SUITE(op_code)
-
+/*
 BOOST_AUTO_TEST_CASE(op_cat) {
 	test_cat(0);
 	test_cat(STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -574,7 +569,7 @@ BOOST_AUTO_TEST_CASE(op_xor) {
 	test_xor(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_xor(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
-/*
+
 BOOST_AUTO_TEST_CASE(op_div) {
 	test_div(0);
 	test_div(STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -582,20 +577,24 @@ BOOST_AUTO_TEST_CASE(op_div) {
 	test_div(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
 
+
 BOOST_AUTO_TEST_CASE(op_mod) {
 	test_mod(0);
 	test_mod(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_mod(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_mod(STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
+*/
 
 BOOST_AUTO_TEST_CASE(op_num2bin) {
 	test_num2bin(0);
+/*
 	test_num2bin(STANDARD_SCRIPT_VERIFY_FLAGS);
 	test_num2bin(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
 	test_num2bin(STANDARD_LOCKTIME_VERIFY_FLAGS);
+*/
 }
-
+/*
 BOOST_AUTO_TEST_CASE(op_bin2num) {
 	test_bin2num(0);
 	test_bin2num(STANDARD_SCRIPT_VERIFY_FLAGS);

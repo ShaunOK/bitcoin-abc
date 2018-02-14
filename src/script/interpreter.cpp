@@ -17,6 +17,11 @@
 
 typedef std::vector<uint8_t> valtype;
 
+//----------------- delete
+#include <iostream>  
+using namespace std;
+
+
 namespace {
 
 inline bool set_success(ScriptError *ret) {
@@ -968,6 +973,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                         serror, SCRIPT_ERR_MOD_BY_ZERO);
                                 }
                                 bn = bn1 % bn2;
+//cout << dec << bn1.getint() << " " << bn2.getint() << " " << bn.getint() << endl;
                                 break;
 
                             case OP_BOOLAND:
