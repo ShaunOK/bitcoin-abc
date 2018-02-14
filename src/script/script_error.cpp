@@ -51,9 +51,9 @@ const char *ScriptErrorString(const ScriptError serror) {
         case SCRIPT_ERR_MOD_BY_ZERO:
             return "Invalid modulo operation";
         case SCRIPT_ERR_INVALID_BIN2NUM_OPERATION:
-            return "Invalid bin2num operation (check operand values)";
+            return "Invalid OP_BIN2NUM operation (check operand values)";
         case SCRIPT_ERR_INVALID_NUM2BIN_OPERATION:
-            return "Invalid bin2num operation (check operand values)";
+            return "Invalid OP_NUM2BIN operation (check operand values)";
         case SCRIPT_ERR_INVALID_SPLIT_RANGE:
             return "Invalid OP_SPLIT range";
         case SCRIPT_ERR_INVALID_BITWISE_OPERATION:

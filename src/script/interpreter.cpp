@@ -5,8 +5,8 @@
 
 #include "interpreter.h"
 
-#include <arpa/inet.h>
-#include <limits.h>
+//#include <arpa/inet.h>
+//#include <limits.h>
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -336,11 +336,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
-            if (opcode == OP_2MUL || opcode == OP_2DIV || opcode == OP_MUL ||
-                opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
+            if (opcode == OP_INVERT || opcode == OP_2MUL || opcode == OP_2DIV ||
+                opcode == OP_MUL || opcode == OP_LSHIFT || opcode == OP_RSHIFT) {
                 // Disabled opcodes.
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
+
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
                 if (fRequireMinimal &&
                     !CheckMinimalPush(vchPushValue, opcode)) {
@@ -779,8 +780,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     //
                     case OP_AND:
                     case OP_OR:
-                    case OP_XOR:
-                    {
+                    case OP_XOR: {
                         // (x1 x2 - out)
                         if (stack.size() < 2) {
                             return set_error(
@@ -796,18 +796,15 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_BITWISE_OPERATION);
                         }
 
-                        if (opcode == OP_AND)
-                        {
+                        if (opcode == OP_AND) {
                             for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] &= vch2[i];
                         }
-                        else if (opcode == OP_OR)
-                        {
+                        else if (opcode == OP_OR) {
                             for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] |= vch2[i];
                         }
-                        else if (opcode == OP_XOR)
-                        {
+                        else if (opcode == OP_XOR) {
                             for (size_t i = 0; i < vch1.size(); i++)
                                 vch1[i] ^= vch2[i];
                         }
@@ -846,6 +843,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             }
                         }
                         break;
+
                     //
                     // Numeric
                     //
@@ -971,9 +969,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 bn = (bn1 < bn2 ? bn1 : bn2);
                                 break;
                             case OP_MAX:
-                                bn = (bn1 > bn2 ? bn1 : bn2);
-                                break;
-                            case OP_2MUL:
                                 bn = (bn1 > bn2 ? bn1 : bn2);
                                 break;
                             default:
@@ -1333,7 +1328,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 }
 
             // Size limits
-            if (stack.size() + altstack.size() > MAX_STACK_SIZE) {
+            if (stack.size() + altstack.size() > 1000) {
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
         }

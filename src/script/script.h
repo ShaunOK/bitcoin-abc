@@ -31,9 +31,6 @@ static const int MAX_PUBKEYS_PER_MULTISIG = 20;
 // Maximum script length in bytes
 static const int MAX_SCRIPT_SIZE = 10000;
 
-// Maximum number of values on script interpreter stack
-static const int MAX_STACK_SIZE = 1000;
-
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp. Thresold is Tue Nov 5 00:53:20 1985 UTC
 static const unsigned int LOCKTIME_THRESHOLD = 500000000;
@@ -112,6 +109,7 @@ enum opcodetype {
     OP_SIZE = 0x82,
 
     // bit logic
+    OP_INVERT = 0x83,
     OP_AND = 0x84,
     OP_OR = 0x85,
     OP_XOR = 0x86,

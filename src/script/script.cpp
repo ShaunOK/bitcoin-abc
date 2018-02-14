@@ -127,6 +127,8 @@ const char *GetOpName(opcodetype opcode) {
             return "OP_SIZE";
 
         // bit logic
+        case OP_INVERT:
+            return "OP_INVERT";
         case OP_AND:
             return "OP_AND";
         case OP_OR:
