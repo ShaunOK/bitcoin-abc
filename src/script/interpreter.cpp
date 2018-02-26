@@ -5,6 +5,7 @@
 
 #include "interpreter.h"
 
+#include <algorithm>
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -810,20 +811,21 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         switch (opcode) {
                             case OP_AND:
-                                for (size_t i = 0; i < vch1.size(); i++) {
-                                    vch1[i] &= vch2[i];
-                                }
+                                std::transform(vch1.begin(), vch1.end(), vch2.begin(), vch1.begin(),
+                                    [](const valtype::value_type& v1, const valtype::value_type& v2)
+                                    { return v1 & v2; });
                                 break;
                             case OP_OR:
-                                for (size_t i = 0; i < vch1.size(); i++) {
-                                    vch1[i] |= vch2[i];
-                                }
+                                std::transform(vch1.begin(), vch1.end(), vch2.begin(), vch1.begin(),
+                                    [](const valtype::value_type& v1, const valtype::value_type& v2)
+                                    { return v1 | v2; });
                                 break;
                             case OP_XOR:
-                                for (size_t i = 0; i < vch1.size(); i++) {
-                                    vch1[i] ^= vch2[i];
-                                }
+                                std::transform(vch1.begin(), vch1.end(), vch2.begin(), vch1.begin(),
+                                    [](const valtype::value_type& v1, const valtype::value_type& v2)
+                                    { return v1 ^ v2; });
                                 break;
+                            default: break;
                         }
                         stack.pop_back();
                     } break;

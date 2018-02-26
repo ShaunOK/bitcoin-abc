@@ -84,7 +84,7 @@ namespace {
         BOOST_CHECK_EQUAL(stack==expected, true);
     }
 
-    /// OP_AND, OP_OR
+    /// OP_AND, OP_OR, OP_XOR
 
     void test_bitwiseop(const CScript& script, uint32_t flags) {
         //number of inputs
@@ -170,7 +170,7 @@ namespace {
 
     }
 
-    /// OP_XOR tests
+    /// OP_XOR
 
     void test_xor(uint32_t flags) {
         CScript script;
@@ -600,6 +600,42 @@ namespace {
         test_num2bin_bin2num(1,flags); //1 byte num2bin output
     }
 
+
+    void test_disabled_opcode(opcodetype opcode, uint32_t flags) {
+        CScript script;
+        script << opcode;
+        test(script,stack_t{{}},flags,SCRIPT_ERR_DISABLED_OPCODE);
+    }
+
+    void test_disabled_opcodes_before_may18_fork(uint32_t flags) {
+	assert((flags&SCRIPT_ENABLE_OPCODES0)==0); //testing using a
+	test_disabled_opcode(OP_CAT,flags);
+	test_disabled_opcode(OP_SPLIT,flags);
+	test_disabled_opcode(OP_AND,flags);
+	test_disabled_opcode(OP_OR,flags);
+	test_disabled_opcode(OP_XOR,flags);
+	test_disabled_opcode(OP_DIV,flags);
+	test_disabled_opcode(OP_MOD,flags);
+	test_disabled_opcode(OP_NUM2BIN,flags);
+	test_disabled_opcode(OP_BIN2NUM,flags);
+	test_disabled_opcode(OP_INVERT,flags);
+	test_disabled_opcode(OP_2MUL,flags);
+	test_disabled_opcode(OP_2DIV,flags);
+	test_disabled_opcode(OP_MUL,flags);
+	test_disabled_opcode(OP_LSHIFT,flags);
+	test_disabled_opcode(OP_RSHIFT,flags);
+    }
+
+    void test_disabled_opcodes_after_may18_fork(uint32_t flags) {
+	assert((flags&SCRIPT_ENABLE_OPCODES0)!=0); //testing using a
+	test_disabled_opcode(OP_INVERT,flags);
+	test_disabled_opcode(OP_2MUL,flags);
+	test_disabled_opcode(OP_2DIV,flags);
+	test_disabled_opcode(OP_MUL,flags);
+	test_disabled_opcode(OP_LSHIFT,flags);
+	test_disabled_opcode(OP_RSHIFT,flags);
+    }
+
 }
 
 /// Entry points
@@ -689,6 +725,18 @@ BOOST_AUTO_TEST_CASE(num2bin_bin2num) {
     test_num2bin_bin2num(STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_OPCODES0 | SCRIPT_ENABLE_OPCODES0);
     test_num2bin_bin2num(STANDARD_NOT_MANDATORY_VERIFY_FLAGS | SCRIPT_ENABLE_OPCODES0);
     test_num2bin_bin2num(STANDARD_LOCKTIME_VERIFY_FLAGS | SCRIPT_ENABLE_OPCODES0);
+}
+
+BOOST_AUTO_TEST_CASE(disabled_opcodes) {
+    test_disabled_opcodes_before_may18_fork(0);
+    test_disabled_opcodes_before_may18_fork(STANDARD_SCRIPT_VERIFY_FLAGS);
+    test_disabled_opcodes_before_may18_fork(STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
+    test_disabled_opcodes_before_may18_fork(STANDARD_LOCKTIME_VERIFY_FLAGS);
+
+    test_disabled_opcodes_after_may18_fork(0|SCRIPT_ENABLE_OPCODES0);
+    test_disabled_opcodes_after_may18_fork(STANDARD_SCRIPT_VERIFY_FLAGS|SCRIPT_ENABLE_OPCODES0);
+    test_disabled_opcodes_after_may18_fork(STANDARD_NOT_MANDATORY_VERIFY_FLAGS|SCRIPT_ENABLE_OPCODES0);
+    test_disabled_opcodes_after_may18_fork(STANDARD_LOCKTIME_VERIFY_FLAGS|SCRIPT_ENABLE_OPCODES0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
